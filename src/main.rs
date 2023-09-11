@@ -38,5 +38,5 @@ impl Sandbox for Planer {
 }
 
 fn main() -> Result{
-    Planer::run(Settings {antialiasing: true, ..Settings::default()})
+    Planer::run(Settings {..Settings::default()})
 }
