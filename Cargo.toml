@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 iced = "0.10.0"
 chrono = "0.4.30"
+serde = { version = "1.0.188", features = ["derive"] }
+serde_yaml = "0.9.25"
+dirs = "5.0.1"

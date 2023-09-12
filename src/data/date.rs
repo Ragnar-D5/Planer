@@ -1,11 +1,18 @@
-use chrono::{NaiveDate, DateTime, Local, Datelike};
+use chrono::{NaiveDate, Datelike};
+use serde::{Deserialize, Serialize};
 
-pub struct Date;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Date {
+    pub year: i32,
+    pub month: Option<u32>,
+    pub week: Option<u32>,
+    pub day: Option<u32>,
+}
 
 impl Date {
 
-    pub fn start_of_month_in_year(year: i32, month: u32) -> u8 {
-        let nd = NaiveDate::from_ymd_opt(year, month, 1);
+    pub fn first_day(self) -> u32 {
+        let nd = NaiveDate::from_ymd_opt(self.year, self.month.unwrap(), 1);
         nd.unwrap().weekday().num_days_from_monday()
     }
 
