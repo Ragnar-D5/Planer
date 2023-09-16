@@ -1,61 +1,63 @@
-use iced::{Sandbox, Element, Result, Settings};
+use iced::{Application, Element, Result, Settings, executor, Theme, Command};
 
 mod screen;
 mod data;
 
-use screen::calendar::{Calendar, self};
+use screen::calendar::{CalendarWidget, self};
 use data::{file_path, save_appointments, read_appointments, YamlVec, Appointment, Date, Priority};
 
-struct Planer;
+struct Planer {
+    screen: Screen,
+}
 
 #[derive(Debug)]
-enum Message {
-    Calendar(calendar::Message)
+pub enum Message {
+    Calendar(calendar::Message),
 }
 
 pub enum Screen {
-    Calendar(calendar::Calendar)
+    Calendar(calendar::CalendarWidget),
+    Settings,
 }
 
-impl Sandbox for Planer {
+impl Application for Planer {
+    type Executor = executor::Default;
+    type Flags = ();
     type Message = Message;
+    type Theme = Theme;
 
-    fn new() -> Self {
-        Planer
+    fn new(flags: ()) -> (Planer, Command<Message>) {
+        (Planer {screen: Screen::Calendar(CalendarWidget::new(Date::default(), Date::default()))}, Command::none())
     }
 
     fn title(&self) -> String {
         "Planer".to_string()
     }
 
-    fn update (&mut self, message: Message) {
+    fn update (&mut self, message: Message) -> Command<Message>{
         match message {
-            Message::Calendar(message) => {}
+            Message::Calendar(message) => {
+                let Screen::Calendar(calendar) = &mut self.screen else {
+                    return Command::none();
+                };
+
+                let command = calendar.update(message);
+
+                command.map(Message::Calendar)
+
+            }
         }
     }
 
     fn view(&self) -> Element<Message> {
-        Calendar.view().map(Message::Calendar)
+        CalendarWidget::view().map(Message::Calendar)
     }
 }
 
 fn main() -> Result{
-    let appointments = YamlVec {
-        data: vec![ Appointment {
-            id: 0,
-            date: Date {
-                year: 2023,
-                month: Some(9),
-                day: Some(12),
-                week: None
-            },
-            priority: Priority::High,
-            tags: vec!["tag".to_string()],
-            description: "hello".to_string()
-        }]
-    };
-    save_appointments(appointments);
-    let saved = read_appointments();
-    println!("{:?}",saved.data[0]);
+    // let appointments = YamlVec { data: vec![Appointment::default()]};
+    // save_appointments(appointments);
+    // let saved = read_appointments();
+    // println!("{:?}",saved.data[0]);
     Planer::run(Settings {..Settings::default()})
 }

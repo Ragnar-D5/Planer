@@ -19,8 +19,14 @@ pub struct Appointment {
     pub id: i32,
     pub date: Date,
     pub priority: Priority,
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
     pub description: String,
+}
+
+impl Default for Appointment {
+    fn default() -> Self {
+        Appointment { id: 0, date: Date::default(), priority: Priority::Low, tags: None, description: "Description".to_string() }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
