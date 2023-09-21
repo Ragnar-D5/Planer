@@ -39,7 +39,6 @@ pub fn read_appointments() -> YamlVec {
     path.push("saved.yml");
     let binding = read_to_string(path).unwrap();
     let file = binding.as_str();
-    println!("{:?}", file);
     let scrape_config: YamlVec = serde_yaml::from_str(file).ok().unwrap();
     scrape_config
 }
@@ -47,11 +46,10 @@ pub fn read_appointments() -> YamlVec {
 pub fn save_appointments(appointments: YamlVec) {
     let mut path = file_path();
     path.push("saved.yml");
-    let yaml = serde_yaml::to_string(&appointments).unwrap();
     let file = OpenOptions::new()
+        .create(true)
         .write(true)    
         .open(path)
         .unwrap();
-    println!("{:?}", yaml);
-    serde_yaml::to_writer(file, &yaml).unwrap();
+    serde_yaml::to_writer(file, &appointments).unwrap();
 }

@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, Datelike};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct Date {
     pub year: i32,
     pub month: Option<u32>,
@@ -26,11 +26,4 @@ impl Date {
         nd.unwrap().weekday().num_days_from_monday()
     }
 
-    pub fn as_str(self) -> String {
-        if self.day != None {
-            self.day.unwrap().to_string()
-        } else {
-            "invalid date".to_string()
-        }
-    } 
 }

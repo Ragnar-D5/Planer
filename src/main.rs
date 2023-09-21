@@ -1,4 +1,9 @@
-use iced::{Application, Element, Result, Settings, executor, Theme, Command};
+use std::fs::{create_dir, OpenOptions};
+
+use iced::futures::io::Copy;
+use iced::{Application, Element, Result, Settings, executor, Theme, Command, Pixels, Subscription};
+use iced::event::Event;
+use iced::widget::{row, column, Text, Container};
 
 mod screen;
 mod data;
@@ -6,15 +11,19 @@ mod data;
 use screen::calendar::{CalendarWidget, self};
 use data::{file_path, save_appointments, read_appointments, YamlVec, Appointment, Date, Priority};
 
+#[derive(Copy, Clone)]
 struct Planer {
     screen: Screen,
+    window_size: (u32, u32),
 }
 
 #[derive(Debug)]
 pub enum Message {
     Calendar(calendar::Message),
+    Event(Event),
 }
 
+#[derive(Copy, Clone)]
 pub enum Screen {
     Calendar(calendar::CalendarWidget),
     Settings,
@@ -27,7 +36,7 @@ impl Application for Planer {
     type Theme = Theme;
 
     fn new(flags: ()) -> (Planer, Command<Message>) {
-        (Planer {screen: Screen::Calendar(CalendarWidget::new(Date::default(), Date::default()))}, Command::none())
+        (Planer {screen: Screen::Calendar(CalendarWidget::new(Date::default(), Date::default())), window_size: (1000,1000)}, Command::none())
     }
 
     fn title(&self) -> String {
@@ -46,18 +55,43 @@ impl Application for Planer {
                 command.map(Message::Calendar)
 
             }
+            Message::Event(event) => {
+                if let Event::Window(iced::window::Event::Resized { width, height }) = event {
+                    self.window_size = (width, height);
+                    println!("{:?}", self.window_size);
+                    self.view();
+                }
+                Command::none()
+            }
         }
     }
 
     fn view(&self) -> Element<Message> {
-        CalendarWidget::view().map(Message::Calendar)
+        CalendarWidget::view(self.window_size).map(Message::Calendar)
+    }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        let mut subs: Vec<iced::Subscription<Self::Message>> =
+            vec![iced::subscription::events().map(|e| Message::Event(e))];
+
+            iced::subscription::Subscription::batch(subs)
     }
 }
 
-fn main() -> Result{
-    // let appointments = YamlVec { data: vec![Appointment::default()]};
+impl Planer {
+    
+}
+
+fn main() -> Result {
+    let _ = create_dir(file_path());
+    let mut path = file_path();
+    path.push("saved.yml");
+    let _file = OpenOptions::new()
+        .create(true)  
+        .write(true)
+        .open(path);
+    // let _appointments = YamlVec { data: vec![Appointment::default()]};
     // save_appointments(appointments);
-    // let saved = read_appointments();
-    // println!("{:?}",saved.data[0]);
+    // let _saved = read_appointments();
     Planer::run(Settings {..Settings::default()})
 }
