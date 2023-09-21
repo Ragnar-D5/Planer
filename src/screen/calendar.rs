@@ -7,40 +7,21 @@ use iced::advanced::{Widget};
 use iced_core::{Size, Padding, Pixels};
 use crate::data::{Date, Appointment};
 
-
-pub struct DayWidget {
-    day: Date,
-    content: Option<Vec<Appointment>>
+#[derive(Copy, Clone)]
+pub struct Calendar {
+    pub active_date: Date,
 }
 
 #[derive(Copy, Clone)]
-pub struct CalendarWidget {
-    start: Date,
-    end: Date
-}
+pub struct CalendarWidget;
 
 #[derive(Debug, Clone)]
 pub enum Message {}
 
-impl DayWidget {
-    pub fn view<'a>(&'a self) -> Element<'a, Message> {
-        let button_increment = Button::new("Increment");
-        let button_decrement = Button::new("Decrement");
-
-        let content = row![]
-            .push(button_increment)
-            .push(button_decrement)
-            .width(Length::Fill)
-            .height(Length::Fill);
-
-        content.into()
-    }
-}
-
 impl CalendarWidget {
 
     pub fn new(start: Date, end: Date) -> Self {
-        CalendarWidget { start: Date::new(2023, Some(9), None, Some(1)), end: Date::new(2023, Some(10), None, Some(1)) } 
+        CalendarWidget
     }
 
     pub fn update(&mut self, message: Message) -> Command<Message>{
@@ -48,21 +29,26 @@ impl CalendarWidget {
         Command::none()
     }
     
-    pub fn view<'a>(window_size: (u32, u32)) -> Element<'a, Message> {
+    pub fn view<'a>(calendar: Calendar) -> Element<'a, Message> {
+        let offset_start = calendar.active_date.first_day_in_month() as i32;
+        println!("{}, {:?}",offset_start, calendar.active_date);
+        let offset_end = - (calendar.active_date.last_day_in_month() as i32);
+        println!("{}, {:?}",offset_end, calendar.active_date);
+        let weeks = calendar.active_date.days_in_month() / 7;
         let content = column![]
             .width(Length::Fill)
             .height(Length::Fill)
             .spacing(10)
-            .push(make_container_row(window_size))
-            .push(make_container_row(window_size))
-            .push(make_container_row(window_size))
-            .push(make_container_row(window_size));
+            .push(make_container_row(offset_start))
+            .push(make_container_row(0))
+            .push(make_container_row(0))
+            .push(make_container_row(0))
+            .push(make_container_row(offset_end));
         content.into()
     }
 }
 
-pub fn make_container<'a>(window_size: (u32, u32), appointment: Appointment) -> Element<'a, Message> {
-    // let padding = Padding::from([window_size.1 as f32 / 8.0, window_size.0 as f32 / 14.0]);
+pub fn make_container<'a>(appointment: Appointment) -> Element<'a, Message> {
     let content = column![]
         .push(Button::new("Hello").width(Length::Fill))
         .push(Button::new("other hello").width(Length::Fill));
@@ -76,13 +62,23 @@ pub fn make_container<'a>(window_size: (u32, u32), appointment: Appointment) -> 
     container
 }
 
-pub fn make_container_row<'a>(window_size: (u32, u32)) -> Element<'a, Message> {
+pub fn make_container_row<'a>(offset: i32) -> Element<'a, Message> {
     let mut content = row![]
         .width(Length::Fill)
         .height(Length::Fill)
         .spacing(10);
     for i in 0..7 {
-        content = content.push(make_container( window_size, Appointment::default()));
+        if offset > 0 && i < offset {
+            content = content.push(Container::new("").width(Length::Fill));
+        } else if offset > 0 && i >= offset {
+            content = content.push(make_container(Appointment::default()));
+        } else if offset == 0 {
+            content = content.push(make_container(Appointment::default()));
+        } else if offset < 0 && i > - offset {
+            content = content.push(Container::new("").width(Length::Fill));
+        } else if offset < 0 && i <= - offset {
+            content = content.push(make_container(Appointment::default()));
+        }
     }
     content
         .into()

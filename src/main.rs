@@ -8,12 +8,13 @@ use iced::widget::{row, column, Text, Container};
 mod screen;
 mod data;
 
-use screen::calendar::{CalendarWidget, self};
+use screen::calendar::{CalendarWidget, Calendar, self};
 use data::{file_path, save_appointments, read_appointments, YamlVec, Appointment, Date, Priority};
 
 #[derive(Copy, Clone)]
 struct Planer {
     screen: Screen,
+    calendar: Calendar,
     window_size: (u32, u32),
 }
 
@@ -36,7 +37,7 @@ impl Application for Planer {
     type Theme = Theme;
 
     fn new(flags: ()) -> (Planer, Command<Message>) {
-        (Planer {screen: Screen::Calendar(CalendarWidget::new(Date::default(), Date::default())), window_size: (1000,1000)}, Command::none())
+        (Planer {screen: Screen::Calendar(CalendarWidget::new(Date::default(), Date::default())), window_size: (1000,1000), calendar: Calendar {active_date: Date::now()}}, Command::none())
     }
 
     fn title(&self) -> String {
@@ -67,7 +68,7 @@ impl Application for Planer {
     }
 
     fn view(&self) -> Element<Message> {
-        CalendarWidget::view(self.window_size).map(Message::Calendar)
+        CalendarWidget::view(self.calendar).map(Message::Calendar)
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {

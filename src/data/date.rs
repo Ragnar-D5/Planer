@@ -21,9 +21,33 @@ impl Date {
         Self { year: year, month: month, week: week, day: day }
     }
 
-    pub fn first_day(self) -> u32 {
+    pub fn now() -> Self {
+        let date = chrono::offset::Local::now().date_naive();
+        Self { year: date.year_ce().1 as i32, month: Some(date.month()), week: Some(date.iso_week().week()), day: Some(date.day()) }
+        
+    }
+
+    pub fn first_day_in_month(self) -> u32 {
         let nd = NaiveDate::from_ymd_opt(self.year, self.month.unwrap(), 1);
-        nd.unwrap().weekday().num_days_from_monday()
+        nd.unwrap()
+        .weekday()
+        .num_days_from_monday()
+    }
+
+    pub fn last_day_in_month(self) -> u32 {
+        NaiveDate::from_ymd_opt(self.year, self.month.unwrap() + 1, 1)
+            .unwrap_or(NaiveDate::from_ymd_opt(self.year + 1, 1, 1).unwrap())
+            .pred_opt()
+            .unwrap()
+            .weekday()
+            .num_days_from_monday()
+    }
+
+    pub fn days_in_month(self) -> u32 {
+        NaiveDate::from_ymd_opt(self.year, self.month.unwrap() + 1, 1)
+            .unwrap_or(NaiveDate::from_ymd_opt(self.year + 1, 1, 1).unwrap())
+            .signed_duration_since(NaiveDate::from_ymd_opt(self.year, self.month.unwrap(), 1).unwrap())
+            .num_days() as u32
     }
 
 }
