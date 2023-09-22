@@ -1,21 +1,18 @@
-use std::default;
-
-use iced::widget::{Text, Column, container};
-use iced::widget::{row, button::Button, Container, column, container::{Appearance, Id}};
-use iced::{Element, Length, window, Command, Renderer, Rectangle};
-use iced::advanced::{Widget};
+use iced::widget::Text;
+use iced::widget::{row, button::Button, Container, column, container::Appearance};
+use iced::{Element, Length, Command};
 use iced_core::mouse::ScrollDelta;
-use iced_core::{Size, Padding, Pixels};
-use crate::data::{Date, Appointment};
+use crate::data::{Date, Appointment, read_appointments};
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Calendar {
     pub active_date: Date,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct CalendarWidget {
     active_date: Date,
+    appointments: Vec<Appointment>,
 }
 
 #[derive(Debug, Clone)]
@@ -27,7 +24,7 @@ pub enum Message {
 impl CalendarWidget{
 
     pub fn new(calendar: Calendar) -> Self {
-        CalendarWidget { active_date: Date::now() }
+        CalendarWidget { active_date: Date::now(), appointments: read_appointments() }
     }
 
     pub fn update(&mut self, message: Message) -> Command<Message>{
@@ -38,16 +35,34 @@ impl CalendarWidget{
     pub fn view<'a>(&self) -> Element<'a, Message> {
         let offset_start = self.active_date.first_day_in_month() as i32;
         let offset_end = - (self.active_date.last_day_in_month() as i32);
-        let weeks = self.active_date.days_in_month() / 7;
-        let content = column![]
+        dbg!(&offset_end);
+        let mut weeks = (self.active_date.days_in_month() as i32 - 7 + offset_start + offset_end) / 7 ;
+        if offset_end == 0 {
+            weeks -= 1;
+        }
+        dbg!(&weeks);
+        let mut first_date = self.active_date;
+        first_date.day = Some(1);
+        let mut content = column![]
             .width(Length::Fill)
             .height(Length::Fill)
-            .spacing(10)
-            .push(make_container_row(offset_start))
-            .push(make_container_row(0))
-            .push(make_container_row(0))
-            .push(make_container_row(0))
-            .push(make_container_row(offset_end));
+            .spacing(10);
+
+        for i in 0..(weeks + 2) {
+            if i == 0 {
+                content = content
+                    .push(self.make_container_row(offset_start, first_date));
+                first_date.add_days(7 - offset_start)
+            } else if i == weeks + 1 {
+                content = content
+                    .push(self.make_container_row(offset_end, first_date));
+            } else {
+                content = content
+                    .push(self.make_container_row(0, first_date));
+                first_date.add_days(7)
+            }
+        }
+
         content.into()
     }
 
@@ -62,7 +77,6 @@ impl CalendarWidget{
                         } else {
                             self.active_date.add_months(1);
                         }
-                        dbg!(self.active_date);
                     }
                 }
             }
@@ -70,43 +84,61 @@ impl CalendarWidget{
         }
         Command::none()
     }   
-}
 
-pub fn make_container<'a>(appointment: Appointment) -> Element<'a, Message> {
-    let content = column![]
-        .push(Button::new("Hello").width(Length::Fill))
-        .push(Button::new("other hello").width(Length::Fill));
-    let mut container = Container::new(content)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(5)
-        .style(DayContainer::new().move_to_style())
-        .into();
-
-    container
-}
-
-pub fn make_container_row<'a>(offset: i32) -> Element<'a, Message> {
-    let mut content = row![]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .spacing(10);
-    for i in 0..7 {
-        if offset > 0 && i < offset {
-            content = content.push(Container::new("").width(Length::Fill));
-        } else if offset > 0 && i >= offset {
-            content = content.push(make_container(Appointment::default()));
-        } else if offset == 0 {
-            content = content.push(make_container(Appointment::default()));
-        } else if offset < 0 && i > - offset {
-            content = content.push(Container::new("").width(Length::Fill));
-        } else if offset < 0 && i <= - offset {
-            content = content.push(make_container(Appointment::default()));
+    pub fn make_container<'a>(&self, appointment: Option<&Appointment>, date: Date) -> Element<'a, Message> {
+        let mut content = column![]
+            .push(Text::new(date.day_string()));
+        if appointment != None {
+            content = content.push(Button::new(iced::widget::text(appointment.unwrap().description())).width(Length::Fill))
         }
+        content = content.push(Button::new("+").width(Length::Fill));
+        let mut container = Container::new(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(5)
+            .style(DayContainer::new().move_to_style())
+            .into();
+    
+        container
     }
-    content
-        .into()
+    
+    pub fn make_container_row<'a>(&self, offset: i32, mut first_date: Date) -> Element<'a, Message> {
+        let mut content = row![]
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .spacing(10);
+        for i in 0..7 {
+            let app_today = 'found: {
+                for appointment in &self.appointments {
+                    if appointment.date == first_date {
+                        break 'found Some(appointment);
+                    }
+                }
+                None
+            };
+            
+            
+            if offset > 0 && i < offset {
+                content = content.push(Container::new("").width(Length::Fill));
+            } else if offset > 0 && i >= offset {
+                content = content.push(self.make_container(app_today, first_date));
+                first_date.add_days(1)
+            } else if offset == 0 {
+                content = content.push(self.make_container(app_today, first_date));
+                first_date.add_days(1)
+            } else if offset < 0 && i > - offset {
+                content = content.push(Container::new("").width(Length::Fill));
+            } else if offset < 0 && i <= - offset {
+                content = content.push(self.make_container(app_today, first_date));
+                first_date.add_days(1)
+            }
+        }
+        content
+            .into()
+    }
 }
+
+
 
 #[derive(Default)]
 enum DayContainerStyle {

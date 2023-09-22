@@ -1,8 +1,7 @@
 use chrono::{NaiveDate, Datelike};
 use serde::{Deserialize, Serialize};
-use std::ops::Sub;
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
 pub struct Date {
     pub year: i32,
     pub month: Option<u32>,
@@ -53,6 +52,23 @@ impl Date {
 
     pub fn add_months(&mut self, months: i32) {
         self.month = Some((self.month.unwrap() as i32 + months) as u32);
+        if self.month.unwrap() < 1 {
+            self.year -= 1;
+            self.month = Some(12)
+        } else if self.month.unwrap() > 12 {
+            self.year += 1;
+            self.month = Some(1)
+        }
+    }
+
+    pub fn add_days(&mut self, days: i32) {
+        self.day = Some((self.day.unwrap() as i32 + days) as u32);
+    }
+
+    pub fn day_string(self) -> String {
+        let day = self.day.unwrap();
+        let month = self.month.unwrap();
+        format!("{day}.{month}")
     }
 
 }

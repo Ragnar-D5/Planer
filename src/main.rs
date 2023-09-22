@@ -1,23 +1,18 @@
 use std::fs::{create_dir, OpenOptions};
-use std::sync::Arc;
-
-use iced::futures::io::Copy;
-use iced::{Application, Element, Result, Settings, executor, Theme, Command, Pixels, Subscription};
+use iced::{Application, Element, Result, Settings, executor, Theme, Command, Subscription};
 use iced::event::Event;
-use iced::widget::{row, column, Text, Container, Button, container};
+use iced::widget::container;
 
 mod screen;
 mod data;
 
 use iced_core::Length;
 use screen::calendar::{CalendarWidget, Calendar, self};
-use data::{file_path, save_appointments, read_appointments, YamlVec, Appointment, Date, Priority};
+use data::{file_path, Date, };
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct Planer {
     screen: Screen,
-    calendar: Calendar,
-    window_size: (u32, u32),
 }
 
 #[derive(Debug)]
@@ -26,7 +21,7 @@ pub enum Message {
     Event(Event),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum Screen {
     Calendar(calendar::CalendarWidget),
 }
@@ -38,7 +33,7 @@ impl Application for Planer {
     type Theme = Theme;
 
     fn new(flags: ()) -> (Planer, Command<Message>) {
-        (Planer {screen: Screen::Calendar(CalendarWidget::new(Calendar { active_date: Date::now() })), window_size: (1000,1000), calendar: Calendar {active_date: Date::now()}}, Command::none())
+        (Planer {screen: Screen::Calendar(CalendarWidget::new(Calendar { active_date: Date::now() }))}, Command::none())
     }
 
     fn title(&self) -> String {
