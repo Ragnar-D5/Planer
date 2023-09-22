@@ -4,6 +4,7 @@ use iced::widget::{Text, Column, container};
 use iced::widget::{row, button::Button, Container, column, container::{Appearance, Id}};
 use iced::{Element, Length, window, Command, Renderer, Rectangle};
 use iced::advanced::{Widget};
+use iced_core::mouse::ScrollDelta;
 use iced_core::{Size, Padding, Pixels};
 use crate::data::{Date, Appointment};
 
@@ -13,28 +14,31 @@ pub struct Calendar {
 }
 
 #[derive(Copy, Clone)]
-pub struct CalendarWidget;
+pub struct CalendarWidget {
+    active_date: Date,
+}
 
 #[derive(Debug, Clone)]
-pub enum Message {}
+pub enum Message {
+    TimeIncrement,
+    TimeDecrement,
+}
 
-impl CalendarWidget {
+impl CalendarWidget{
 
-    pub fn new(start: Date, end: Date) -> Self {
-        CalendarWidget
+    pub fn new(calendar: Calendar) -> Self {
+        CalendarWidget { active_date: Date::now() }
     }
 
     pub fn update(&mut self, message: Message) -> Command<Message>{
-
+        
         Command::none()
     }
     
-    pub fn view<'a>(calendar: Calendar) -> Element<'a, Message> {
-        let offset_start = calendar.active_date.first_day_in_month() as i32;
-        println!("{}, {:?}",offset_start, calendar.active_date);
-        let offset_end = - (calendar.active_date.last_day_in_month() as i32);
-        println!("{}, {:?}",offset_end, calendar.active_date);
-        let weeks = calendar.active_date.days_in_month() / 7;
+    pub fn view<'a>(&self) -> Element<'a, Message> {
+        let offset_start = self.active_date.first_day_in_month() as i32;
+        let offset_end = - (self.active_date.last_day_in_month() as i32);
+        let weeks = self.active_date.days_in_month() / 7;
         let content = column![]
             .width(Length::Fill)
             .height(Length::Fill)
@@ -46,6 +50,26 @@ impl CalendarWidget {
             .push(make_container_row(offset_end));
         content.into()
     }
+
+    pub fn handle_event(&mut self, event: iced_core::Event) -> Command<Message>{
+        use iced_core::Event::*;
+        match event {
+            Mouse(e) => {
+                if let iced::mouse::Event::WheelScrolled { delta} = e {
+                    if let ScrollDelta::Lines { x, y } = delta {
+                        if y > 0.0 {
+                            self.active_date.add_months(-1);
+                        } else {
+                            self.active_date.add_months(1);
+                        }
+                        dbg!(self.active_date);
+                    }
+                }
+            }
+            _ => {}
+        }
+        Command::none()
+    }   
 }
 
 pub fn make_container<'a>(appointment: Appointment) -> Element<'a, Message> {
