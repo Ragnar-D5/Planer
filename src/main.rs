@@ -1,13 +1,15 @@
 use std::fs::{create_dir, OpenOptions};
+use std::sync::Arc;
 
 use iced::futures::io::Copy;
 use iced::{Application, Element, Result, Settings, executor, Theme, Command, Pixels, Subscription};
 use iced::event::Event;
-use iced::widget::{row, column, Text, Container};
+use iced::widget::{row, column, Text, Container, Button, container};
 
 mod screen;
 mod data;
 
+use iced_core::Length;
 use screen::calendar::{CalendarWidget, Calendar, self};
 use data::{file_path, save_appointments, read_appointments, YamlVec, Appointment, Date, Priority};
 
@@ -27,7 +29,6 @@ pub enum Message {
 #[derive(Copy, Clone)]
 pub enum Screen {
     Calendar(calendar::CalendarWidget),
-    Settings,
 }
 
 impl Application for Planer {
@@ -37,7 +38,7 @@ impl Application for Planer {
     type Theme = Theme;
 
     fn new(flags: ()) -> (Planer, Command<Message>) {
-        (Planer {screen: Screen::Calendar(CalendarWidget::new(Date::default(), Date::default())), window_size: (1000,1000), calendar: Calendar {active_date: Date::now()}}, Command::none())
+        (Planer {screen: Screen::Calendar(CalendarWidget::new(Calendar { active_date: Date::now() })), window_size: (1000,1000), calendar: Calendar {active_date: Date::now()}}, Command::none())
     }
 
     fn title(&self) -> String {
@@ -57,10 +58,8 @@ impl Application for Planer {
 
             }
             Message::Event(event) => {
-                if let Event::Window(iced::window::Event::Resized { width, height }) = event {
-                    self.window_size = (width, height);
-                    println!("{:?}", self.window_size);
-                    self.view();
+                if let Screen::Calendar(calendar) = &mut self.screen {
+                    return calendar.handle_event(event).map(Message::Calendar)
                 }
                 Command::none()
             }
@@ -68,7 +67,14 @@ impl Application for Planer {
     }
 
     fn view(&self) -> Element<Message> {
-        CalendarWidget::view(self.calendar).map(Message::Calendar)
+        let content = match &self.screen {
+            Screen::Calendar(calendar) => calendar.view().map(Message::Calendar)
+        };
+
+        container(content)
+            .height(Length::Fill)
+            .width(Length::Fill)
+            .into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {

@@ -1,5 +1,6 @@
 use chrono::{NaiveDate, Datelike};
 use serde::{Deserialize, Serialize};
+use std::ops::Sub;
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct Date {
@@ -48,6 +49,10 @@ impl Date {
             .unwrap_or(NaiveDate::from_ymd_opt(self.year + 1, 1, 1).unwrap())
             .signed_duration_since(NaiveDate::from_ymd_opt(self.year, self.month.unwrap(), 1).unwrap())
             .num_days() as u32
+    }
+
+    pub fn add_months(&mut self, months: i32) {
+        self.month = Some((self.month.unwrap() as i32 + months) as u32);
     }
 
 }
