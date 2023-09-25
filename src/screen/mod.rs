@@ -1,5 +1,2 @@
 pub mod calendar;
-
-use iced::Theme;
-
-pub type Renderer = iced::Renderer<Theme>;
+pub mod modal_overlay;
