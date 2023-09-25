@@ -17,13 +17,21 @@ impl Default for Date {
 
 impl Date {
 
-    pub fn new(year: i32, month: Option<u32>, week: Option<u32>, day: Option<u32>) -> Self {
+    pub fn new(year: i32, month: Option<u32>, mut week: Option<u32>, day: Option<u32>) -> Self {
+        // if week == None {
+        //     week = Some(NaiveDate::from_ymd_opt(year, month.unwrap(), day.unwrap())
+        //         .unwrap()
+        //         .iso_week()
+        //         .week());
+        //     Self { year: year, month: month, week: week, day: day }
+        // } else {
         Self { year: year, month: month, week: week, day: day }
+        // }
     }
 
     pub fn now() -> Self {
         let date = chrono::offset::Local::now().date_naive();
-        Self { year: date.year_ce().1 as i32, month: Some(date.month()), week: Some(date.iso_week().week()), day: Some(date.day()) }
+        Self { year: date.year_ce().1 as i32, month: Some(date.month()), week: None, day: Some(date.day()) } // Some(date.iso_week().week())
         
     }
 

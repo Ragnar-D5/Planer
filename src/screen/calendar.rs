@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use chrono::NaiveDate;
-use iced::widget::{Text, text, button, container, text_input, PickList};
+use iced::widget::{Text, text, button, container, text_input, PickList, Space};
 use iced::widget::{row, button::Button, Container, column, container::Appearance};
 use iced::{Element, Length, Command, theme, window};
 use iced_core::mouse::ScrollDelta;
@@ -55,7 +55,9 @@ pub enum Message {
     DialogDate(String),
     DialogWarning(String),
     DialogTags(String),
-    DialogDescription(String)
+    DialogDescription(String),
+    DialogCancel,
+    DialogSubmit,
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +115,30 @@ impl CalendarWidget{
             }
             Message::DialogDescription(string) => {
                 self.dialog_appointment.description = string.clone();
+                Command::none()
+            }
+            Message::DialogCancel => {
+                self.edit_dialog = None;
+                Command::none()
+            }
+            Message::DialogSubmit => {
+                if valid_date(self.dialog_appointment.date.clone()).is_ok() &&
+                    valid_date(self.dialog_appointment.warning.clone()).is_ok() && 
+                    valid_tags(self.dialog_appointment.tags.clone()).is_ok() {
+                        self.appointments.push(
+                            Appointment {
+                                id: new_id(self.appointments.clone()),
+                                date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
+                                priority: self.dialog_appointment.priority,
+                                warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
+                                tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
+                                description: self.dialog_appointment.description.clone()
+                            }
+                        );
+                        save_appointments(self.appointments.clone());
+                        self.edit_dialog = None;
+                    }
+                // function for saving this stuff
                 Command::none()
             }
             _ => Command::none()
@@ -222,9 +248,10 @@ impl CalendarWidget{
                     ],
                     row![
                         button("Cancel")
-                            .on_press(Message::Dialog(DialogMessage::Cancel)),
+                            .on_press(Message::DialogCancel),
+                        Space::new(Length::Fill, Length::Shrink),
                         button("Submit")
-                            .on_press(Message::Dialog(DialogMessage::Submit))
+                            .on_press(Message::DialogSubmit)
                         ]
                 ]
                 .spacing(20),
@@ -233,7 +260,9 @@ impl CalendarWidget{
             .padding(10)
             .style(theme::Container::Box);
             
-            Modal::new(content, modal).into()
+            Modal::new(content, modal)
+                .on_blur(Message::DialogCancel)
+                .into()
         } else {
             return content.into()
         }
@@ -255,6 +284,7 @@ impl CalendarWidget{
             }
             Window(e) => {
                 if let iced::window::Event::CloseRequested = e {
+                    dbg!(&self.appointments);
                     save_appointments(self.appointments.clone());
                     return window::close()
                 }
@@ -395,4 +425,18 @@ fn valid_tags(string: String) -> Result<Vec<String>, String> {
         tags_string.push(tag.to_string())
     }
     return Ok(tags_string)
+}
+
+fn new_id(appointments: Vec<Appointment>) -> i32 {
+    let mut ids: Vec<i32> = vec![];
+    for appointment in appointments {
+        ids.push(appointment.id);
+    }
+    ids.sort();
+    for i in 0..ids.len() {
+        if i as i32 != ids[i] {
+            return i as i32
+        }
+    }
+    return ids.len() as i32
 }
