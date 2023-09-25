@@ -7,8 +7,8 @@ mod screen;
 mod data;
 
 use iced_core::Length;
-use screen::calendar::{CalendarWidget, Calendar, self};
-use data::{file_path, Date, };
+use screen::calendar::{CalendarWidget, self};
+use data::file_path;
 
 #[derive(Clone)]
 struct Planer {
@@ -32,8 +32,8 @@ impl Application for Planer {
     type Message = Message;
     type Theme = Theme;
 
-    fn new(flags: ()) -> (Planer, Command<Message>) {
-        (Planer {screen: Screen::Calendar(CalendarWidget::new(Calendar { active_date: Date::now() }))}, Command::none())
+    fn new(_flags: ()) -> (Planer, Command<Message>) {
+        (Planer {screen: Screen::Calendar(CalendarWidget::new()) }, Command::none())
     }
 
     fn title(&self) -> String {
@@ -43,9 +43,7 @@ impl Application for Planer {
     fn update (&mut self, message: Message) -> Command<Message>{
         match message {
             Message::Calendar(message) => {
-                let Screen::Calendar(calendar) = &mut self.screen else {
-                    return Command::none();
-                };
+                let Screen::Calendar(calendar) = &mut self.screen;
 
                 let command = calendar.update(message);
 
@@ -53,10 +51,9 @@ impl Application for Planer {
 
             }
             Message::Event(event) => {
-                if let Screen::Calendar(calendar) = &mut self.screen {
-                    return calendar.handle_event(event).map(Message::Calendar)
-                }
-                Command::none()
+                let Screen::Calendar(calendar) = &mut self.screen;
+
+                return calendar.handle_event(event).map(Message::Calendar)
             }
         }
     }
@@ -73,7 +70,7 @@ impl Application for Planer {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        let mut subs: Vec<iced::Subscription<Self::Message>> =
+        let subs: Vec<iced::Subscription<Self::Message>> =
             vec![iced::subscription::events().map(|e| Message::Event(e))];
 
             iced::subscription::Subscription::batch(subs)

@@ -71,4 +71,11 @@ impl Date {
         format!("{day}.{month}")
     }
 
+    pub fn fmt(self) -> String {
+        let day = self.day.unwrap();
+        let month = self.month.unwrap();
+        let year = self.year;
+        format!("{day}.{month}.{year}")
+    }
+
 }

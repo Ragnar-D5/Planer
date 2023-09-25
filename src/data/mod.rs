@@ -3,15 +3,31 @@ pub mod common;
 
 pub use date::Date;
 pub use common::file_path;
+use std::fmt;
 
 use std::fs::{read_to_string, OpenOptions};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum Priority {
     High,
     Middle,
     Low
+}
+
+impl Priority {
+    pub const ALL: &[Self] = &[Self::High, Self::Middle, Self::Low];
+}
+
+impl fmt::Display for Priority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Priority::High => "High",
+            Priority::Middle => "Middle",
+            Priority::Low => "Low",
+        }
+        .fmt(f)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
