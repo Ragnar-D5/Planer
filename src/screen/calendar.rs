@@ -139,15 +139,11 @@ impl CalendarWidget{
                 Command::none()
             }
             Message::DialogSubmit(appointment) => {
-                if appointment != None {
-                    let index = self.appointments.iter().position(|x| *x == appointment.clone().unwrap()).unwrap();
-                    self.appointments.remove(index);
-                }
                 if valid_date(self.dialog_appointment.date.clone()).is_ok() &&
                     valid_date(self.dialog_appointment.warning.clone()).is_ok() && 
                     valid_tags(self.dialog_appointment.tags.clone()).is_ok() {
-                        println!("{},{},{}",edit,index,self.appointments.len());
-                        if edit{ //not very elegant but should work
+                        if appointment != None{
+                            let index = self.appointments.iter().position(|x| *x == appointment.clone().unwrap()).unwrap();
                             self.appointments[index] =
                                 Appointment {
                                     id: self.appointments[index].id,
@@ -170,7 +166,6 @@ impl CalendarWidget{
                                 }
                             );
                         }
-                        println!("{}",self.appointments.len());
                         save_appointments(self.appointments.clone());
                         self.edit_dialog = None;
                     }
