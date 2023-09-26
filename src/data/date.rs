@@ -17,7 +17,7 @@ impl Default for Date {
 
 impl Date {
 
-    pub fn new(year: i32, month: Option<u32>, mut week: Option<u32>, day: Option<u32>) -> Self {
+    pub fn new(year: i32, month: Option<u32>, week: Option<u32>, day: Option<u32>) -> Self {
         // if week == None {
         //     week = Some(NaiveDate::from_ymd_opt(year, month.unwrap(), day.unwrap())
         //         .unwrap()
