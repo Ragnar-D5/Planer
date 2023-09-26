@@ -38,9 +38,16 @@ impl Default for DialogAppointment {
     }
 }
 
+impl DialogAppointment {
+    fn from_appointment(appointment: Appointment) -> Self {
+        let tags = appointment.tags.unwrap().join(", ");
+        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.date.fmt(), tags: tags, description: appointment.description }
+    }
+}
+
 #[derive(PartialEq, Clone)]
 enum DialogOption {
-    Edit(i32),
+    Edit(Appointment),
     Add(Date)
 }
 
@@ -57,7 +64,7 @@ pub enum Message {
     DialogTags(String),
     DialogDescription(String),
     DialogCancel,
-    DialogSubmit,
+    DialogSubmit(Option<Appointment>),
 }
 
 #[derive(Debug, Clone)]
@@ -85,7 +92,17 @@ impl CalendarWidget{
                 Command::none()
             }
             Message::EditAppointment(id) => {
-                self.edit_dialog = Some(DialogOption::Edit(id));
+                dbg!(&id);
+                let mut appointment = Appointment::default();
+                for app in &self.appointments {
+                    if id == app.id {
+                        dbg!(&app);
+                        appointment = app.clone();
+                        self.edit_dialog = Some(DialogOption::Edit(appointment.clone()));
+                        self.dialog_appointment = DialogAppointment::from_appointment(appointment);
+                        break;
+                    }
+                }
                 Command::none()
             }
             Message::DialogDate(string) => {
@@ -121,7 +138,11 @@ impl CalendarWidget{
                 self.edit_dialog = None;
                 Command::none()
             }
-            Message::DialogSubmit => {
+            Message::DialogSubmit(appointment) => {
+                if appointment != None {
+                    let index = self.appointments.iter().position(|x| *x == appointment.clone().unwrap()).unwrap();
+                    self.appointments.remove(index);
+                }
                 if valid_date(self.dialog_appointment.date.clone()).is_ok() &&
                     valid_date(self.dialog_appointment.warning.clone()).is_ok() && 
                     valid_tags(self.dialog_appointment.tags.clone()).is_ok() {
@@ -174,42 +195,38 @@ impl CalendarWidget{
             }
         }
 
-        if let Some(DialogOption::Edit(id)) = self.edit_dialog {
-            let mut appointment = Appointment::default();
-            for app in &self.appointments {
-                if id == appointment.id {
-                    break;
-                }
-                appointment = app.clone()
-
-            };
+        if let Some(DialogOption::Edit(appointment)) = &self.edit_dialog {
             let modal = container(
                 column![
                     column![
                         text("Date").size(12),
-                        text_input("dd.mm.yyyy", appointment.date.fmt().as_str())
+                        text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
                             .on_input(Message::DialogDate)
                     ],
                     column![
                         text("Priority").size(12),
-                        PickList::new(Priority::ALL, Some(appointment.priority), Message::DialogPriority)
+                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
                     ],
                     column![
                         text("Warning").size(12),
-                        text_input("dd.mm.yyyy", appointment.warning.fmt().as_str())
+                        text_input("dd.mm.yyyy", self.dialog_appointment.warning.as_str())
+                            .on_input(Message::DialogWarning)
                     ],
                     column![
                         text("Tags").size(12),
+                        text_input("tag_1, tag_2", self.dialog_appointment.tags.as_str())
+                            .on_input(Message::DialogTags)
                     ],
                     column![
                         text("Description").size(12),
-                        text_input("",appointment.description.as_str())
+                        text_input("", self.dialog_appointment.description.as_str())
+                            .on_input(Message::DialogDescription)
                     ],
                     row![
                         button("Cancel")
-                            .on_press(Message::Dialog(DialogMessage::Cancel)),
+                            .on_press(Message::DialogCancel),
                         button("Submit")
-                            .on_press(Message::Dialog(DialogMessage::Submit))
+                            .on_press(Message::DialogSubmit(Some(appointment.clone())))
                         ]
                 ]
                 .spacing(20),
@@ -251,7 +268,7 @@ impl CalendarWidget{
                             .on_press(Message::DialogCancel),
                         Space::new(Length::Fill, Length::Shrink),
                         button("Submit")
-                            .on_press(Message::DialogSubmit)
+                            .on_press(Message::DialogSubmit(None))
                         ]
                 ]
                 .spacing(20),
