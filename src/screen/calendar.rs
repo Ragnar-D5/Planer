@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 
 use chrono::NaiveDate;
-use iced::widget::{Text, text, button, container, text_input, PickList, Space};
+use iced::widget::{Text, text, button, container, text_input, PickList, Space, self};
 use iced::widget::{row, button::Button, Container, column, container::Appearance};
 use iced::{Element, Length, Command, theme, window};
+use iced_core::keyboard::KeyCode;
 use iced_core::mouse::ScrollDelta;
 
 use crate::data::{Date, Appointment, read_appointments, save_appointments, Priority};
@@ -29,7 +30,7 @@ pub struct DialogAppointment {
     priority: Priority,
     warning: String,
     tags: String,
-    description: String
+    description: String,
 }
 
 impl Default for DialogAppointment {
@@ -92,11 +93,9 @@ impl CalendarWidget{
                 Command::none()
             }
             Message::EditAppointment(id) => {
-                dbg!(&id);
                 let mut appointment = Appointment::default();
                 for app in &self.appointments {
                     if id == app.id {
-                        dbg!(&app);
                         appointment = app.clone();
                         self.edit_dialog = Some(DialogOption::Edit(appointment.clone()));
                         self.dialog_appointment = DialogAppointment::from_appointment(appointment);
@@ -107,23 +106,20 @@ impl CalendarWidget{
             }
             Message::DialogDate(string) => {
                 self.dialog_appointment.date = string.clone();
-                let _date = valid_date(string).ok();
-                // if date != None {
-                //     self.dialog_appointment.date = date.unwrap();
-                //     widget::focus_next()
-                // } else {
-                //     Command::none()
-                // }
                 Command::none()
             }
             Message::DialogPriority(priority) => {
                 self.dialog_appointment.priority = priority;
-                Command::none()
+                widget::focus_next()
             }
             Message::DialogWarning(string) => {
                 self.dialog_appointment.warning = string.clone();
-                let _date = valid_date(string).ok();
-                Command::none()
+                let date = valid_date(string).ok();
+                if date != None {
+                    widget::focus_next()
+                } else {
+                    Command::none()
+                }
             }
             Message::DialogTags(string) => {
                 self.dialog_appointment.tags = string.clone();
@@ -159,7 +155,6 @@ impl CalendarWidget{
                         save_appointments(self.appointments.clone());
                         self.edit_dialog = None;
                     }
-                // function for saving this stuff
                 Command::none()
             }
             _ => Command::none()
@@ -204,10 +199,6 @@ impl CalendarWidget{
                             .on_input(Message::DialogDate)
                     ],
                     column![
-                        text("Priority").size(12),
-                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
-                    ],
-                    column![
                         text("Warning").size(12),
                         text_input("dd.mm.yyyy", self.dialog_appointment.warning.as_str())
                             .on_input(Message::DialogWarning)
@@ -222,9 +213,14 @@ impl CalendarWidget{
                         text_input("", self.dialog_appointment.description.as_str())
                             .on_input(Message::DialogDescription)
                     ],
+                    column![
+                        text("Priority").size(12),
+                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
+                    ],
                     row![
                         button("Cancel")
                             .on_press(Message::DialogCancel),
+                        Space::new(Length::Fill, Length::Shrink),
                         button("Submit")
                             .on_press(Message::DialogSubmit(Some(appointment.clone())))
                         ]
@@ -235,7 +231,9 @@ impl CalendarWidget{
             .padding(10)
             .style(theme::Container::Box);
             
-            Modal::new(content, modal).into()
+            Modal::new(content, modal)
+                .on_blur(Message::DialogCancel)
+                .into()
         } else if let Some(DialogOption::Add(_date)) = self.edit_dialog {
             let modal = container(
                 column![
@@ -243,10 +241,6 @@ impl CalendarWidget{
                         text("Date").size(12),
                         text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
                             .on_input(Message::DialogDate)
-                    ],
-                    column![
-                        text("Priority").size(12),
-                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
                     ],
                     column![
                         text("Warning").size(12),
@@ -262,6 +256,10 @@ impl CalendarWidget{
                         text("Description").size(12),
                         text_input("", self.dialog_appointment.description.as_str())
                             .on_input(Message::DialogDescription)
+                    ],
+                    column![
+                        text("Priority").size(12),
+                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
                     ],
                     row![
                         button("Cancel")
@@ -299,11 +297,27 @@ impl CalendarWidget{
                     }
                 }
             }
-            Window(e) => {
-                if let iced::window::Event::CloseRequested = e {
-                    dbg!(&self.appointments);
-                    save_appointments(self.appointments.clone());
-                    return window::close()
+            Window(e) => {                                   
+                if let iced::window::Event::CloseRequested = e {    
+                    save_appointments(self.appointments.clone());   
+                    return window::close()                          
+                }
+            }
+            Keyboard(e) => {
+                match e {
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode::Tab,
+                        modifiers: _ 
+                    } => {
+                        return widget::focus_next()
+                    }
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode:: Escape,
+                        modifiers: _ 
+                    } => {
+                        self.edit_dialog = None;
+                    }
+                    _ => {}
                 }
             }
             _ => {}

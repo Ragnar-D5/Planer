@@ -25,7 +25,7 @@ impl Date {
         //         .week());
         //     Self { year: year, month: month, week: week, day: day }
         // } else {
-        Self { year: year, month: month, week: week, day: day }
+        Self { year, month, week, day }
         // }
     }
 
