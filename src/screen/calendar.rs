@@ -142,16 +142,31 @@ impl CalendarWidget{
                 if valid_date(self.dialog_appointment.date.clone()).is_ok() &&
                     valid_date(self.dialog_appointment.warning.clone()).is_ok() && 
                     valid_tags(self.dialog_appointment.tags.clone()).is_ok() {
-                        self.appointments.push(
-                            Appointment {
-                                id: new_id(self.appointments.clone()),
-                                date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
-                                priority: self.dialog_appointment.priority,
-                                warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
-                                tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
-                                description: self.dialog_appointment.description.clone()
-                            }
-                        );
+                        println!("{},{},{}",edit,index,self.appointments.len());
+                        if edit{ //not very elegant but should work
+                            self.appointments[index] =
+                                Appointment {
+                                    id: self.appointments[index].id,
+                                    date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
+                                    priority: self.dialog_appointment.priority,
+                                    warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
+                                    tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
+                                    description: self.dialog_appointment.description.clone()
+                                }
+                        }
+                        else{
+                            self.appointments.push(
+                                Appointment {
+                                    id: new_id(self.appointments.clone()),
+                                    date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
+                                    priority: self.dialog_appointment.priority,
+                                    warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
+                                    tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
+                                    description: self.dialog_appointment.description.clone()
+                                }
+                            );
+                        }
+                        println!("{}",self.appointments.len());
                         save_appointments(self.appointments.clone());
                         self.edit_dialog = None;
                     }
