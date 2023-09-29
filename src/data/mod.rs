@@ -1,7 +1,7 @@
 pub mod date;
 pub mod common;
 
-pub use date::Date;
+pub use date::PDate;
 pub use common::file_path;
 use std::fmt;
 
@@ -33,16 +33,16 @@ impl fmt::Display for Priority {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Appointment {
     pub id: i32,
-    pub date: Date,
+    pub date: PDate,
     pub priority: Priority,
-    pub warning: Date,
+    pub warning: PDate,
     pub tags: Option<Vec<String>>,
     pub description: String,
 }
 
 impl Default for Appointment {
     fn default() -> Self {
-        Appointment { id: 0, date: Date::default(), priority: Priority::Low, warning: Date::default(), tags: None, description: "Description".to_string() }
+        Appointment { id: 0, date: PDate::default(), priority: Priority::Low, warning: PDate::default(), tags: None, description: "Description".to_string() }
     }
 }
 
