@@ -1,23 +1,27 @@
 use std::fmt::Debug;
 
-use chrono::NaiveDate;
-use iced::widget::{Text, text, button, container, text_input, PickList, Space};
+use chrono::naive::{NaiveDateTime, Days};
+use chrono::naive::NaiveDate;
+use chrono::{Datelike, Months};
+use iced::widget::{Text, text, button, container, text_input, PickList, Space, self};
 use iced::widget::{row, button::Button, Container, column, container::Appearance};
 use iced::{Element, Length, Command, theme, window};
+use iced_core::keyboard::KeyCode;
 use iced_core::mouse::ScrollDelta;
 
-use crate::data::{Date, Appointment, read_appointments, save_appointments, Priority};
+use crate::data::{Appointment, read_appointments, save_appointments, Priority};
 use crate::screen::modal_overlay::Modal;
+use crate::data::{PDate, date};
 
 
 #[derive(Clone)]
 pub struct Calendar {
-    pub active_date: Date,
+    pub active_date: NaiveDateTime,
 }
 
 #[derive(Clone)]
 pub struct CalendarWidget {
-    active_date: Date,
+    active_date: NaiveDateTime,
     appointments: Vec<Appointment>,
     edit_dialog: Option<DialogOption>,
     dialog_appointment: DialogAppointment,
@@ -29,7 +33,7 @@ pub struct DialogAppointment {
     priority: Priority,
     warning: String,
     tags: String,
-    description: String
+    description: String,
 }
 
 impl Default for DialogAppointment {
@@ -48,16 +52,15 @@ impl DialogAppointment {
 #[derive(PartialEq, Clone)]
 enum DialogOption {
     Edit(Appointment),
-    Add(Date)
+    Add(NaiveDateTime)
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     TimeIncrement,
     TimeDecrement,
-    AddAppointment(Date),
+    AddAppointment(NaiveDateTime),
     EditAppointment(i32),
-    Dialog(DialogMessage),
     DialogPriority(Priority),
     DialogDate(String),
     DialogWarning(String),
@@ -67,20 +70,10 @@ pub enum Message {
     DialogSubmit(Option<Appointment>),
 }
 
-#[derive(Debug, Clone)]
-pub enum DialogMessage {
-    Date(Date),
-    Warning(Date),
-    Tag(String),
-    Description(String),
-    Cancel,
-    Submit
-}
-
 impl CalendarWidget{
 
     pub fn new() -> Self {
-        CalendarWidget { active_date: Date::now(), appointments: read_appointments(), edit_dialog: None, dialog_appointment: DialogAppointment::default() }
+        CalendarWidget { active_date: date::now(), appointments: read_appointments(), edit_dialog: None, dialog_appointment: DialogAppointment::default() }
     }
 
     pub fn update(&mut self, message: Message) -> Command<Message>{
@@ -88,16 +81,13 @@ impl CalendarWidget{
             Message::AddAppointment(date) => {
                 self.edit_dialog = Some(DialogOption::Add(date));
                 self.dialog_appointment = DialogAppointment::default();
-                self.dialog_appointment.date = date.fmt();
+                self.dialog_appointment.date = date::naive_date_time_as_string(date);
                 Command::none()
             }
             Message::EditAppointment(id) => {
-                dbg!(&id);
-                let mut appointment = Appointment::default();
                 for app in &self.appointments {
                     if id == app.id {
-                        dbg!(&app);
-                        appointment = app.clone();
+                        let appointment = app.clone();
                         self.edit_dialog = Some(DialogOption::Edit(appointment.clone()));
                         self.dialog_appointment = DialogAppointment::from_appointment(appointment);
                         break;
@@ -107,23 +97,20 @@ impl CalendarWidget{
             }
             Message::DialogDate(string) => {
                 self.dialog_appointment.date = string.clone();
-                let _date = valid_date(string).ok();
-                // if date != None {
-                //     self.dialog_appointment.date = date.unwrap();
-                //     widget::focus_next()
-                // } else {
-                //     Command::none()
-                // }
                 Command::none()
             }
             Message::DialogPriority(priority) => {
                 self.dialog_appointment.priority = priority;
-                Command::none()
+                widget::focus_next()
             }
             Message::DialogWarning(string) => {
                 self.dialog_appointment.warning = string.clone();
-                let _date = valid_date(string).ok();
-                Command::none()
+                let date = valid_date(string).ok();
+                if date != None {
+                    widget::focus_next()
+                } else {
+                    Command::none()
+                }
             }
             Message::DialogTags(string) => {
                 self.dialog_appointment.tags = string.clone();
@@ -142,34 +129,23 @@ impl CalendarWidget{
                 if valid_date(self.dialog_appointment.date.clone()).is_ok() &&
                     valid_date(self.dialog_appointment.warning.clone()).is_ok() && 
                     valid_tags(self.dialog_appointment.tags.clone()).is_ok() {
-                        if appointment != None{
+                        if appointment != None {
                             let index = self.appointments.iter().position(|x| *x == appointment.clone().unwrap()).unwrap();
-                            self.appointments[index] =
-                                Appointment {
-                                    id: self.appointments[index].id,
-                                    date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
-                                    priority: self.dialog_appointment.priority,
-                                    warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
-                                    tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
-                                    description: self.dialog_appointment.description.clone()
-                                }
+                            self.appointments.remove(index);
                         }
-                        else{
-                            self.appointments.push(
-                                Appointment {
-                                    id: new_id(self.appointments.clone()),
-                                    date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
-                                    priority: self.dialog_appointment.priority,
-                                    warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
-                                    tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
-                                    description: self.dialog_appointment.description.clone()
-                                }
-                            );
-                        }
+                        self.appointments.push(
+                            Appointment {
+                                id: new_id(self.appointments.clone()),
+                                date: valid_date(self.dialog_appointment.date.clone()).unwrap(),
+                                priority: self.dialog_appointment.priority,
+                                warning: valid_date(self.dialog_appointment.warning.clone()).unwrap(),
+                                tags: Some(valid_tags(self.dialog_appointment.tags.clone()).unwrap()),
+                                description: self.dialog_appointment.description.clone()
+                            }
+                        );
                         save_appointments(self.appointments.clone());
                         self.edit_dialog = None;
                     }
-                // function for saving this stuff
                 Command::none()
             }
             _ => Command::none()
@@ -177,14 +153,16 @@ impl CalendarWidget{
     }
     
     pub fn view<'a>(&self) -> Element<'a, Message> {
-        let offset_start = self.active_date.first_day_in_month() as i32;
-        let offset_end = - (self.active_date.last_day_in_month() as i32);
-        let mut weeks = (self.active_date.days_in_month() as i32 - 7 + offset_start + offset_end) / 7 ;
+        let offset_start = date::first_day_in_month(self.active_date);
+        let offset_end = - date::last_day_in_month(self.active_date);
+        let mut weeks = (date::days_in_month(self.active_date) - 7 + offset_start + offset_end) / 7 ;
         if offset_end == 0 {
             weeks -= 1;
         }
-        let mut first_date = self.active_date;
-        first_date.day = Some(1);
+        let mut first_date = NaiveDate::from_ymd_opt(self.active_date.year(), self.active_date.month(), 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
         let mut content = column![]
             .width(Length::Fill)
             .height(Length::Fill)
@@ -194,14 +172,14 @@ impl CalendarWidget{
             if i == 0 {
                 content = content
                     .push(self.make_container_row(offset_start, first_date));
-                first_date.add_days(7 - offset_start)
+                first_date = first_date.checked_add_days(Days::new(7 - offset_start as u64)).unwrap();
             } else if i == weeks + 1 {
                 content = content
                     .push(self.make_container_row(offset_end, first_date));
             } else {
                 content = content
                     .push(self.make_container_row(0, first_date));
-                first_date.add_days(7)
+                first_date = first_date.checked_add_days(Days::new(7)).unwrap();
             }
         }
 
@@ -212,10 +190,6 @@ impl CalendarWidget{
                         text("Date").size(12),
                         text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
                             .on_input(Message::DialogDate)
-                    ],
-                    column![
-                        text("Priority").size(12),
-                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
                     ],
                     column![
                         text("Warning").size(12),
@@ -232,9 +206,14 @@ impl CalendarWidget{
                         text_input("", self.dialog_appointment.description.as_str())
                             .on_input(Message::DialogDescription)
                     ],
+                    column![
+                        text("Priority").size(12),
+                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
+                    ],
                     row![
                         button("Cancel")
                             .on_press(Message::DialogCancel),
+                        Space::new(Length::Fill, Length::Shrink),
                         button("Submit")
                             .on_press(Message::DialogSubmit(Some(appointment.clone())))
                         ]
@@ -245,7 +224,9 @@ impl CalendarWidget{
             .padding(10)
             .style(theme::Container::Box);
             
-            Modal::new(content, modal).into()
+            Modal::new(content, modal)
+                .on_blur(Message::DialogCancel)
+                .into()
         } else if let Some(DialogOption::Add(_date)) = self.edit_dialog {
             let modal = container(
                 column![
@@ -253,10 +234,6 @@ impl CalendarWidget{
                         text("Date").size(12),
                         text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
                             .on_input(Message::DialogDate)
-                    ],
-                    column![
-                        text("Priority").size(12),
-                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
                     ],
                     column![
                         text("Warning").size(12),
@@ -272,6 +249,10 @@ impl CalendarWidget{
                         text("Description").size(12),
                         text_input("", self.dialog_appointment.description.as_str())
                             .on_input(Message::DialogDescription)
+                    ],
+                    column![
+                        text("Priority").size(12),
+                        PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
                     ],
                     row![
                         button("Cancel")
@@ -302,18 +283,34 @@ impl CalendarWidget{
                 if let iced::mouse::Event::WheelScrolled { delta} = e {
                     if let ScrollDelta::Lines { x: _, y } = delta {
                         if y > 0.0 {
-                            self.active_date.add_months(-1);
+                            self.active_date = self.active_date.checked_sub_months(Months::new(1)).unwrap();
                         } else {
-                            self.active_date.add_months(1);
+                            self.active_date = self.active_date.checked_add_months(Months::new(1)).unwrap();
                         }
                     }
                 }
             }
-            Window(e) => {
-                if let iced::window::Event::CloseRequested = e {
-                    dbg!(&self.appointments);
-                    save_appointments(self.appointments.clone());
-                    return window::close()
+            Window(e) => {                                   
+                if let iced::window::Event::CloseRequested = e {    
+                    save_appointments(self.appointments.clone());   
+                    return window::close()                          
+                }
+            }
+            Keyboard(e) => {
+                match e {
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode::Tab,
+                        modifiers: _ 
+                    } => {
+                        return widget::focus_next()
+                    }
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode:: Escape,
+                        modifiers: _ 
+                    } => {
+                        self.edit_dialog = None;
+                    }
+                    _ => {}
                 }
             }
             _ => {}
@@ -321,9 +318,9 @@ impl CalendarWidget{
         Command::none()
     }   
 
-    pub fn make_container<'a>(&self, appointment: Option<&Appointment>, date: Date) -> Element<'a, Message> {
+    pub fn make_container<'a>(&self, appointment: Option<&Appointment>, date: NaiveDateTime) -> Element<'a, Message> {
         let mut content = column![]
-            .push(Text::new(date.day_string()));
+            .push(Text::new(date::day_string(&date)));
         if appointment != None {
             content = content.push(Button::new(iced::widget::text(appointment.unwrap().description())).width(Length::Fill)
                 .on_press(Message::EditAppointment(appointment.unwrap().id)))
@@ -342,7 +339,7 @@ impl CalendarWidget{
         container
     }
     
-    pub fn make_container_row<'a>(&self, offset: i32, mut first_date: Date) -> Element<'a, Message> {
+    pub fn make_container_row<'a>(&self, offset: i32, mut first_date: NaiveDateTime) -> Element<'a, Message> {
         let mut content = row![]
             .width(Length::Fill)
             .height(Length::Fill)
@@ -350,7 +347,7 @@ impl CalendarWidget{
         for i in 0..7 {
             let app_today = 'found: {
                 for appointment in &self.appointments {
-                    if appointment.date == first_date {
+                    if appointment.date == date::naive_date_time_to_p_date(first_date) {
                         break 'found Some(appointment);
                     }
                 }
@@ -362,15 +359,15 @@ impl CalendarWidget{
                 content = content.push(Container::new("").width(Length::Fill));
             } else if offset > 0 && i >= offset {
                 content = content.push(self.make_container(app_today, first_date));
-                first_date.add_days(1)
+                first_date = first_date.checked_add_days(Days::new(1)).unwrap();
             } else if offset == 0 {
                 content = content.push(self.make_container(app_today, first_date));
-                first_date.add_days(1)
+                first_date = first_date.checked_add_days(Days::new(1)).unwrap();
             } else if offset < 0 && i > - offset {
                 content = content.push(Container::new("").width(Length::Fill));
             } else if offset < 0 && i <= - offset {
                 content = content.push(self.make_container(app_today, first_date));
-                first_date.add_days(1)
+                first_date = first_date.checked_add_days(Days::new(1)).unwrap();
             }
         }
         content
@@ -424,7 +421,7 @@ impl iced::widget::container::StyleSheet for DayContainer {
     }
 }
 
-fn valid_date(string: String) -> Result<Date, String> {
+fn valid_date(string: String) -> Result<PDate, String> {
     let time: Vec<&str> = string.split(".").collect();
     if time.len() != 3 {
         return Err(string)
@@ -439,7 +436,7 @@ fn valid_date(string: String) -> Result<Date, String> {
     } else if NaiveDate::from_ymd_opt(year.clone().unwrap(), month.clone().unwrap(), day.clone().unwrap()).is_none() {
         return Err(string)
     } else {
-        return Ok(Date::new(year.unwrap(), Some(month.unwrap()), None, Some(day.unwrap())))
+        return Ok(PDate::new(year.unwrap(), month.unwrap(), day.unwrap(), 0, 0, 0))
     }
 
 }
