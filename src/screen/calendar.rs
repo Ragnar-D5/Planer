@@ -45,7 +45,7 @@ impl Default for DialogAppointment {
 impl DialogAppointment {
     fn from_appointment(appointment: Appointment) -> Self {
         let tags = appointment.tags.unwrap().join(", ");
-        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.date.fmt(), tags: tags, description: appointment.description }
+        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.warning.fmt(), tags: tags, description: appointment.description }
     }
 }
 
