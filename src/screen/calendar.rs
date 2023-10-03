@@ -6,7 +6,7 @@ use chrono::{Datelike, Months};
 use iced::widget::{Text, text, button, container, text_input, PickList, Space, self};
 use iced::widget::{row, button::Button, Container, column, container::Appearance};
 use iced::{Element, Length, Command, theme, window};
-use iced_core::keyboard::KeyCode;
+use iced_core::keyboard::{KeyCode, Modifiers};
 use iced_core::mouse::ScrollDelta;
 
 use crate::data::{Appointment, read_appointments, save_appointments, Priority};
@@ -19,12 +19,43 @@ pub struct Calendar {
     pub active_date: NaiveDateTime,
 }
 
+#[derive(Clone, Debug)]
+enum Depth {
+    Year = 0,
+    Month = 1,
+    Week = 2,
+    Day = 3,
+}
+
+impl Depth {
+
+    pub const fn depth_increase(&self) -> Depth {
+        match *self {
+            Depth::Year => Depth::Month,
+            Depth::Month => Depth::Week,
+            Depth::Week => Depth::Day,
+            Depth::Day => Depth::Day
+        }
+    }
+
+    pub const fn depth_decrease(&self) -> Depth {
+        match *self {
+            Depth::Year => Depth::Year,
+            Depth::Month => Depth::Year,
+            Depth::Week => Depth::Month,
+            Depth::Day => Depth::Week            
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct CalendarWidget {
     active_date: NaiveDateTime,
+    depth: Depth,
     appointments: Vec<Appointment>,
     edit_dialog: Option<DialogOption>,
     dialog_appointment: DialogAppointment,
+    modifiers: Modifiers,
 }
 
 #[derive(Clone)]
@@ -57,6 +88,8 @@ enum DialogOption {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    DepthIncrease,
+    DepthDecrease,
     TimeIncrement,
     TimeDecrement,
     AddAppointment(NaiveDateTime),
@@ -73,7 +106,14 @@ pub enum Message {
 impl CalendarWidget{
 
     pub fn new() -> Self {
-        CalendarWidget { active_date: date::now(), appointments: read_appointments(), edit_dialog: None, dialog_appointment: DialogAppointment::default() }
+        CalendarWidget { 
+            active_date: date::now(), 
+            depth: Depth::Month,
+            appointments: read_appointments(), 
+            edit_dialog: None, 
+            dialog_appointment: DialogAppointment::default(), 
+            modifiers: Modifiers::empty() 
+        }
     }
 
     pub fn update(&mut self, message: Message) -> Command<Message>{
@@ -145,7 +185,7 @@ impl CalendarWidget{
                         );
                         save_appointments(self.appointments.clone());
                         self.edit_dialog = None;
-                    }
+                    }   
                 Command::none()
             }
             _ => Command::none()
@@ -153,36 +193,24 @@ impl CalendarWidget{
     }
     
     pub fn view<'a>(&self) -> Element<'a, Message> {
-        let offset_start = date::first_day_in_month(self.active_date);
-        let offset_end = - date::last_day_in_month(self.active_date);
-        let mut weeks = (date::days_in_month(self.active_date) - 7 + offset_start + offset_end) / 7 ;
-        if offset_end == 0 {
-            weeks -= 1;
-        }
-        let mut first_date = NaiveDate::from_ymd_opt(self.active_date.year(), self.active_date.month(), 1)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap();
-        let mut content = column![]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .spacing(10);
-
-        for i in 0..(weeks + 2) {
-            if i == 0 {
-                content = content
-                    .push(self.make_container_row(offset_start, first_date));
-                first_date = first_date.checked_add_days(Days::new(7 - offset_start as u64)).unwrap();
-            } else if i == weeks + 1 {
-                content = content
-                    .push(self.make_container_row(offset_end, first_date));
-            } else {
-                content = content
-                    .push(self.make_container_row(0, first_date));
-                first_date = first_date.checked_add_days(Days::new(7)).unwrap();
+        dbg!(&self.depth);
+        let content = match self.depth {
+            Depth::Year => {
+                self.view_year(self.active_date)
+            },
+            Depth::Month => {
+                self.view_month(self.active_date)
             }
-        }
-
+            Depth::Week => {
+                // self.view_week()
+                
+                self.view_month(self.active_date)
+            }
+            Depth::Day => {
+                // self.view_day()
+                self.view_month(self.active_date)
+            }
+        };
         if let Some(DialogOption::Edit(appointment)) = &self.edit_dialog {
             let modal = container(
                 column![
@@ -276,13 +304,255 @@ impl CalendarWidget{
         }
     }
 
+    // fn view_week<'a>(&self, active_date: NaiveDateTime) -> Element<'a, Message> {
+    //     for _i in 0..7 {
+            
+    //     }
+    // }    
+
+    fn view_year<'a>(&self, mut active_date: NaiveDateTime) -> Element<'a, Message> {
+        active_date = NaiveDate::from_ymd_opt(active_date.year(), 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let mut content = column![].width(Length::Fill).height(Length::Fill);
+        for _i in 0..2 {
+            let res = self.year_month_row(active_date);
+            content = content.push(res.0);
+            active_date = res.1;
+        }
+        dbg!(active_date);
+        content.into()
+    }
+
+    fn year_month_row<'a>(&self, mut active_date: NaiveDateTime) -> (Element<'a, Message>, NaiveDateTime) {
+        let mut row = row![].spacing(10).width(Length::Fill).height(Length::Fill);
+        for _i in 0..6 {
+            let res = self.year_month(active_date);
+            row = row.push(res.0);
+            active_date = res.1;
+        }
+        (row.into(), active_date)
+    }
+
+    fn year_month<'a>(&self, mut active_date: NaiveDateTime) -> (Element<'a, Message>, NaiveDateTime) {
+        let mut column =  column![].spacing(5).width(Length::Fill).height(Length::Fill);
+        while true {
+            let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
+            for i in 0..7 {
+                if active_date.day() == 1 && active_date.weekday().num_days_from_monday() != i {
+                    row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
+                } else if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
+                    row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
+                } else {
+                    let _appointments = self.find_appointments_from_date(active_date);
+                    row = row.push(button(text("")).width(Length::Fill).height(Length::Fill));
+                    active_date = active_date.checked_add_days(Days::new(1)).unwrap();
+                }
+
+            }
+            column = column.push(row);
+            if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
+                break
+            }
+        }
+        (column.into(), active_date.checked_add_days(Days::new(1)).unwrap())
+    }
+
+    fn find_appointments_from_date(&self, active_date: NaiveDateTime) -> Vec<&Appointment> {
+        self.appointments.iter().filter(|x| x.date == date::naive_date_time_to_p_date(active_date)).collect()
+        
+    }
+
+    fn view_month<'a>(&self, mut active_date: NaiveDateTime) -> Element<'a, Message> {
+        active_date = NaiveDate::from_ymd_opt(active_date.year(), active_date.month(), 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let mut column = column![];
+        while true {
+            let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
+            for i in 0..7 {
+                if active_date.day() == 1 && active_date.weekday().num_days_from_monday() != i {
+                    row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
+                } else if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
+                    row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
+                } else {
+                    let _appointments = self.find_appointments_from_date(active_date);
+                    row = row.push(self.make_container(active_date));
+                    active_date = active_date.checked_add_days(Days::new(1)).unwrap();
+                }
+
+            }
+            column = column.push(row);
+            if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
+                break
+            }
+        }
+        column.into()
+    }
+    
+
+    fn make_container<'a>(&self, active_date: NaiveDateTime) -> Element<'a, Message> {
+        let appointments = self.find_appointments_from_date(active_date);
+        let mut content = column![]
+            .push(Text::new(date::naive_date_time_as_string(active_date)));
+        for appointment in appointments {
+            content = content.push(Button::new(iced::widget::text(appointment.description())).width(Length::Fill)
+                .on_press(Message::EditAppointment(appointment.id)))
+        }
+        content = content.push(Button::new("+")
+            .width(Length::Fill)
+            .on_press(Message::AddAppointment(active_date))
+        );
+        let container = Container::new(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(5)
+            .style(DayContainer::new().move_to_style())
+            .into();
+    
+        container
+    }
+
+    // pub fn view_month<'a>(&self, active_date: NaiveDateTime) -> Element<'a, Message> {
+    //     let offset_start = date::first_day_in_month(active_date);
+    //     let offset_end = - date::last_day_in_month(active_date);
+    //     let mut weeks = (date::days_in_month(active_date) - 7 + offset_start + offset_end) / 7 ;
+    //     if offset_end == 0 {
+    //         weeks -= 1;
+    //     }
+    //     let mut first_date = NaiveDate::from_ymd_opt(active_date.year(), active_date.month(), 1)
+    //         .unwrap()
+    //         .and_hms_opt(0, 0, 0)
+    //         .unwrap();
+    //     let mut content = column![]
+    //         .width(Length::Fill)
+    //         .height(Length::Fill)
+    //         .spacing(10);
+
+    //     for i in 0..(weeks + 2) {
+    //         if i == 0 {
+    //             content = content
+    //                 .push(self.make_container_row(offset_start, first_date));
+    //             first_date = first_date.checked_add_days(Days::new(7 - offset_start as u64)).unwrap();
+    //         } else if i == weeks + 1 {
+    //             content = content
+    //                 .push(self.make_container_row(offset_end, first_date));
+    //         } else {
+    //             content = content
+    //                 .push(self.make_container_row(0, first_date));
+    //             first_date = first_date.checked_add_days(Days::new(7)).unwrap();
+    //         }
+    //     }
+
+    //     if let Some(DialogOption::Edit(appointment)) = &self.edit_dialog {
+    //         let modal = container(
+    //             column![
+    //                 column![
+    //                     text("Date").size(12),
+    //                     text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
+    //                         .on_input(Message::DialogDate)
+    //                 ],
+    //                 column![
+    //                     text("Warning").size(12),
+    //                     text_input("dd.mm.yyyy", self.dialog_appointment.warning.as_str())
+    //                         .on_input(Message::DialogWarning)
+    //                 ],
+    //                 column![
+    //                     text("Tags").size(12),
+    //                     text_input("tag_1, tag_2", self.dialog_appointment.tags.as_str())
+    //                         .on_input(Message::DialogTags)
+    //                 ],
+    //                 column![
+    //                     text("Description").size(12),
+    //                     text_input("", self.dialog_appointment.description.as_str())
+    //                         .on_input(Message::DialogDescription)
+    //                 ],
+    //                 column![
+    //                     text("Priority").size(12),
+    //                     PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
+    //                 ],
+    //                 row![
+    //                     button("Cancel")
+    //                         .on_press(Message::DialogCancel),
+    //                     Space::new(Length::Fill, Length::Shrink),
+    //                     button("Submit")
+    //                         .on_press(Message::DialogSubmit(Some(appointment.clone())))
+    //                     ]
+    //             ]
+    //             .spacing(20),
+    //         )
+    //         .width(300)
+    //         .padding(10)
+    //         .style(theme::Container::Box);
+            
+    //         Modal::new(content, modal)
+    //             .on_blur(Message::DialogCancel)
+    //             .into()
+    //     } else if let Some(DialogOption::Add(_date)) = self.edit_dialog {
+    //         let modal = container(
+    //             column![
+    //                 column![
+    //                     text("Date").size(12),
+    //                     text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
+    //                         .on_input(Message::DialogDate)
+    //                 ],
+    //                 column![
+    //                     text("Warning").size(12),
+    //                     text_input("dd.mm.yyyy", self.dialog_appointment.warning.as_str())
+    //                         .on_input(Message::DialogWarning)
+    //                 ],
+    //                 column![
+    //                     text("Tags").size(12),
+    //                     text_input("tag_1, tag_2",self.dialog_appointment.tags.as_str())
+    //                         .on_input(Message::DialogTags)
+    //                 ],
+    //                 column![
+    //                     text("Description").size(12),
+    //                     text_input("", self.dialog_appointment.description.as_str())
+    //                         .on_input(Message::DialogDescription)
+    //                 ],
+    //                 column![
+    //                     text("Priority").size(12),
+    //                     PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
+    //                 ],
+    //                 row![
+    //                     button("Cancel")
+    //                         .on_press(Message::DialogCancel),
+    //                     Space::new(Length::Fill, Length::Shrink),
+    //                     button("Submit")
+    //                         .on_press(Message::DialogSubmit(None))
+    //                     ]
+    //             ]
+    //             .spacing(20),
+    //         )
+    //         .width(300)
+    //         .padding(10)
+    //         .style(theme::Container::Box);
+            
+    //         Modal::new(content, modal)
+    //             .on_blur(Message::DialogCancel)
+    //             .into()
+    //     } else {
+    //         return content.into()
+    //     }
+    // }
+
     pub fn handle_event(&mut self, event: iced_core::Event) -> Command<Message>{
         use iced_core::Event::*;
         match event {
             Mouse(e) => {
                 if let iced::mouse::Event::WheelScrolled { delta} = e {
                     if let ScrollDelta::Lines { x: _, y } = delta {
-                        if y > 0.0 {
+                        dbg!(&self.modifiers, &y); 
+                        if self.modifiers.control() {
+                            if y > 0.0 {
+                                self.depth = self.depth.depth_increase();
+                            } else {
+                                self.depth = self.depth.depth_decrease();
+                            }
+                        } else if y > 0.0 {
                             self.active_date = self.active_date.checked_sub_months(Months::new(1)).unwrap();
                         } else {
                             self.active_date = self.active_date.checked_add_months(Months::new(1)).unwrap();
@@ -310,6 +580,9 @@ impl CalendarWidget{
                     } => {
                         self.edit_dialog = None;
                     }
+                    iced_core::keyboard::Event::ModifiersChanged( modifiers) => {
+                        self.modifiers = modifiers
+                    }
                     _ => {}
                 }
             }
@@ -318,61 +591,42 @@ impl CalendarWidget{
         Command::none()
     }   
 
-    pub fn make_container<'a>(&self, appointment: Option<&Appointment>, date: NaiveDateTime) -> Element<'a, Message> {
-        let mut content = column![]
-            .push(Text::new(date::day_string(&date)));
-        if appointment != None {
-            content = content.push(Button::new(iced::widget::text(appointment.unwrap().description())).width(Length::Fill)
-                .on_press(Message::EditAppointment(appointment.unwrap().id)))
-        }
-        content = content.push(Button::new("+")
-            .width(Length::Fill)
-            .on_press(Message::AddAppointment(date))
-        );
-        let container = Container::new(content)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(5)
-            .style(DayContainer::new().move_to_style())
-            .into();
     
-        container
-    }
     
-    pub fn make_container_row<'a>(&self, offset: i32, mut first_date: NaiveDateTime) -> Element<'a, Message> {
-        let mut content = row![]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .spacing(10);
-        for i in 0..7 {
-            let app_today = 'found: {
-                for appointment in &self.appointments {
-                    if appointment.date == date::naive_date_time_to_p_date(first_date) {
-                        break 'found Some(appointment);
-                    }
-                }
-                None
-            };
+    // pub fn make_container_row<'a>(&self, offset: i32, mut first_date: NaiveDateTime) -> Element<'a, Message> {
+    //     let mut content = row![]
+    //         .width(Length::Fill)
+    //         .height(Length::Fill)
+    //         .spacing(10);
+    //     for i in 0..7 {
+    //         let app_today = 'found: {
+    //             for appointment in &self.appointments {
+    //                 if appointment.date == date::naive_date_time_to_p_date(first_date) {
+    //                     break 'found Some(appointment);
+    //                 }
+    //             }
+    //             None
+    //         };
             
             
-            if offset > 0 && i < offset {
-                content = content.push(Container::new("").width(Length::Fill));
-            } else if offset > 0 && i >= offset {
-                content = content.push(self.make_container(app_today, first_date));
-                first_date = first_date.checked_add_days(Days::new(1)).unwrap();
-            } else if offset == 0 {
-                content = content.push(self.make_container(app_today, first_date));
-                first_date = first_date.checked_add_days(Days::new(1)).unwrap();
-            } else if offset < 0 && i > - offset {
-                content = content.push(Container::new("").width(Length::Fill));
-            } else if offset < 0 && i <= - offset {
-                content = content.push(self.make_container(app_today, first_date));
-                first_date = first_date.checked_add_days(Days::new(1)).unwrap();
-            }
-        }
-        content
-            .into()
-    }
+    //         if offset > 0 && i < offset {
+    //             content = content.push(Container::new("").width(Length::Fill));
+    //         } else if offset > 0 && i >= offset {
+    //             content = content.push(self.make_container(app_today, first_date));
+    //             first_date = first_date.checked_add_days(Days::new(1)).unwrap();
+    //         } else if offset == 0 {
+    //             content = content.push(self.make_container(app_today, first_date));
+    //             first_date = first_date.checked_add_days(Days::new(1)).unwrap();
+    //         } else if offset < 0 && i > - offset {
+    //             content = content.push(Container::new("").width(Length::Fill));
+    //         } else if offset < 0 && i <= - offset {
+    //             content = content.push(self.make_container(app_today, first_date));
+    //             first_date = first_date.checked_add_days(Days::new(1)).unwrap();
+    //         }
+    //     }
+    //     content
+    //         .into()
+    // }
 }
 
 

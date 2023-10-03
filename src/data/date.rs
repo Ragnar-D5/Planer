@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use chrono::naive::{NaiveDateTime, NaiveDate};
-use chrono::{Datelike, Timelike, NaiveTime};
+use chrono::{Datelike, Timelike, NaiveTime, Days};
 
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq)]
@@ -64,6 +64,10 @@ pub fn first_day_in_month( date: NaiveDateTime ) -> i32 {
     nd
         .weekday()
         .num_days_from_monday() as i32
+}
+
+pub fn check_last_day_in_month( date: NaiveDateTime ) -> bool {
+    date.checked_add_days(Days::new(1)).unwrap().day() == 1
 }
 
 pub fn last_day_in_month( date: NaiveDateTime ) -> i32 {

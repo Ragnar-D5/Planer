@@ -5,7 +5,7 @@ pub use date::PDate;
 pub use common::file_path;
 use std::fmt;
 
-use std::fs::{read_to_string, OpenOptions};
+use std::fs::{read_to_string, OpenOptions, remove_file};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +64,7 @@ pub fn read_appointments() -> Vec<Appointment> {
 pub fn save_appointments(appointments: Vec<Appointment>) {
     let mut path = file_path();
     path.push("saved.yml");
+    let _ = remove_file(&path);
     let file = OpenOptions::new()
         .create(true)
         .write(true)    
