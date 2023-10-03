@@ -76,7 +76,7 @@ impl Default for DialogAppointment {
 impl DialogAppointment {
     fn from_appointment(appointment: Appointment) -> Self {
         let tags = appointment.tags.unwrap().join(", ");
-        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.date.fmt(), tags: tags, description: appointment.description }
+        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.warning.fmt(), tags: tags, description: appointment.description }
     }
 }
 
@@ -193,7 +193,6 @@ impl CalendarWidget{
     }
     
     pub fn view<'a>(&self) -> Element<'a, Message> {
-        dbg!(&self.depth);
         let content = match self.depth {
             Depth::Year => {
                 self.view_year(self.active_date)
@@ -321,7 +320,6 @@ impl CalendarWidget{
             content = content.push(res.0);
             active_date = res.1;
         }
-        dbg!(active_date);
         content.into()
     }
 
@@ -337,7 +335,7 @@ impl CalendarWidget{
 
     fn year_month<'a>(&self, mut active_date: NaiveDateTime) -> (Element<'a, Message>, NaiveDateTime) {
         let mut column =  column![].spacing(5).width(Length::Fill).height(Length::Fill);
-        while true {
+        loop {
             let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
             for i in 0..7 {
                 if active_date.day() == 1 && active_date.weekday().num_days_from_monday() != i {
@@ -370,7 +368,7 @@ impl CalendarWidget{
             .and_hms_opt(0, 0, 0)
             .unwrap();
         let mut column = column![];
-        while true {
+        loop {
             let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
             for i in 0..7 {
                 if active_date.day() == 1 && active_date.weekday().num_days_from_monday() != i {
@@ -545,7 +543,6 @@ impl CalendarWidget{
             Mouse(e) => {
                 if let iced::mouse::Event::WheelScrolled { delta} = e {
                     if let ScrollDelta::Lines { x: _, y } = delta {
-                        dbg!(&self.modifiers, &y); 
                         if self.modifiers.control() {
                             if y > 0.0 {
                                 self.depth = self.depth.depth_increase();
