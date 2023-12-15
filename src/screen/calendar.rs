@@ -3,11 +3,13 @@ use std::fmt::Debug;
 use chrono::naive::{NaiveDateTime, Days};
 use chrono::naive::NaiveDate;
 use chrono::{Datelike, Months};
-use iced::widget::{Text, text, button, container, text_input, PickList, Space, self};
-use iced::widget::{row, button::Button, Container, column, container::Appearance};
+use iced::widget::{Text, text, button, container, text_input, PickList, Space, self, scrollable, Row};
+use iced::widget::{column, button::Button, Container, row, button::Appearance};
 use iced::{Element, Length, Command, theme, window};
+use iced_core::{Widget, Vector};
 use iced_core::keyboard::{KeyCode, Modifiers};
 use iced_core::mouse::ScrollDelta;
+use iced_core::alignment::Horizontal;
 
 use crate::data::{Appointment, read_appointments, save_appointments, Priority};
 use crate::screen::modal_overlay::Modal;
@@ -24,7 +26,6 @@ enum Depth {
     Year = 0,
     Month = 1,
     Week = 2,
-    Day = 3,
 }
 
 impl Depth {
@@ -33,8 +34,7 @@ impl Depth {
         match *self {
             Depth::Year => Depth::Month,
             Depth::Month => Depth::Week,
-            Depth::Week => Depth::Day,
-            Depth::Day => Depth::Day
+            Depth::Week => Depth::Week,
         }
     }
 
@@ -42,8 +42,7 @@ impl Depth {
         match *self {
             Depth::Year => Depth::Year,
             Depth::Month => Depth::Year,
-            Depth::Week => Depth::Month,
-            Depth::Day => Depth::Week            
+            Depth::Week => Depth::Month,         
         }
     }
 }
@@ -76,7 +75,7 @@ impl Default for DialogAppointment {
 impl DialogAppointment {
     fn from_appointment(appointment: Appointment) -> Self {
         let tags = appointment.tags.unwrap().join(", ");
-        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.warning.fmt(), tags: tags, description: appointment.description }
+        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.warning.fmt(), tags, description: appointment.description }
     }
 }
 
@@ -88,8 +87,6 @@ enum DialogOption {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    DepthIncrease,
-    DepthDecrease,
     TimeIncrement,
     TimeDecrement,
     AddAppointment(NaiveDateTime),
@@ -118,6 +115,28 @@ impl CalendarWidget{
 
     pub fn update(&mut self, message: Message) -> Command<Message>{
         match message {
+            Message::TimeIncrement => {
+                self. active_date = match self.depth {
+                    Depth::Week => self.active_date.checked_add_days(Days::new(7))
+                    .unwrap_or(self.active_date),
+                    Depth::Month => self.active_date.checked_add_months(Months::new(1))
+                        .unwrap_or(self.active_date),
+                    Depth::Year => self.active_date.checked_add_months(Months::new(12))
+                        .unwrap_or(self.active_date)
+                };
+                Command::none()
+            }
+            Message::TimeDecrement => {
+                self. active_date = match self.depth {
+                    Depth::Week => self.active_date.checked_sub_days(Days::new(7))
+                    .unwrap_or(self.active_date),
+                    Depth::Month => self.active_date.checked_sub_months(Months::new(1))
+                        .unwrap_or(self.active_date),
+                    Depth::Year => self.active_date.checked_sub_months(Months::new(12))
+                        .unwrap_or(self.active_date)
+                };
+                Command::none()
+            }
             Message::AddAppointment(date) => {
                 self.edit_dialog = Some(DialogOption::Add(date));
                 self.dialog_appointment = DialogAppointment::default();
@@ -201,13 +220,7 @@ impl CalendarWidget{
                 self.view_month(self.active_date)
             }
             Depth::Week => {
-                // self.view_week()
-                
-                self.view_month(self.active_date)
-            }
-            Depth::Day => {
-                // self.view_day()
-                self.view_month(self.active_date)
+                self.view_week(self.active_date)
             }
         };
         if let Some(DialogOption::Edit(appointment)) = &self.edit_dialog {
@@ -303,11 +316,27 @@ impl CalendarWidget{
         }
     }
 
-    // fn view_week<'a>(&self, active_date: NaiveDateTime) -> Element<'a, Message> {
-    //     for _i in 0..7 {
-            
-    //     }
-    // }    
+    fn view_week<'a>(&self, active_date: NaiveDateTime) -> Element<'a, Message> {
+        let mut content = row![].spacing(10).width(Length::Fill).height(Length::Fill);
+        for i in 0..7 {
+            let mut column = column![];
+            column = match i {
+                0 => column.push(text("Monday")),
+                1 => column.push(text("Tuesday")),
+                2 => column.push(text("Wednesday")),
+                3 => column.push(text("Thursday")),
+                4 => column.push(text("Friday")),
+                5 => column.push(text("Saturday")),
+                6 => column.push(text("Sunday")),
+                _ => column,
+            };
+            column = column.push(
+                container(scrollable(button("hello")))
+            );
+            content = content.push(column);
+        }
+        content.into()
+    }    
 
     fn view_year<'a>(&self, mut active_date: NaiveDateTime) -> Element<'a, Message> {
         active_date = NaiveDate::from_ymd_opt(active_date.year(), 1, 1)
@@ -334,7 +363,22 @@ impl CalendarWidget{
     }
 
     fn year_month<'a>(&self, mut active_date: NaiveDateTime) -> (Element<'a, Message>, NaiveDateTime) {
-        let mut column =  column![].spacing(5).width(Length::Fill).height(Length::Fill);
+        let mut content =  column![].spacing(5).width(Length::Fill).height(Length::Fill);
+        content = match active_date.month() {
+            1 => content.push(text("January").horizontal_alignment(Horizontal::Center)),
+            2 => content.push(text("February").horizontal_alignment(Horizontal::Center)),
+            3 => content.push(text("March").horizontal_alignment(Horizontal::Center)),
+            4 => content.push(text("April").horizontal_alignment(Horizontal::Center)),
+            5 => content.push(text("May").horizontal_alignment(Horizontal::Center)),
+            6 => content.push(text("June").horizontal_alignment(Horizontal::Center)),
+            7 => content.push(text("July").horizontal_alignment(Horizontal::Center)),
+            8 => content.push(text("August").horizontal_alignment(Horizontal::Center)),
+            9 => content.push(text("September").horizontal_alignment(Horizontal::Center)),
+            10 => content.push(text("October").horizontal_alignment(Horizontal::Center)),
+            11 => content.push(text("November").horizontal_alignment(Horizontal::Center)),
+            12 => content.push(text("December").horizontal_alignment(Horizontal::Center)),
+            _ => content,
+        };
         loop {
             let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
             for i in 0..7 {
@@ -344,17 +388,17 @@ impl CalendarWidget{
                     row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
                 } else {
                     let _appointments = self.find_appointments_from_date(active_date);
-                    row = row.push(button(text("")).width(Length::Fill).height(Length::Fill));
+                    row = row.push(button(text("")).style(DayContainer::new().move_to_style()).width(Length::Fill).height(Length::Fill));
                     active_date = active_date.checked_add_days(Days::new(1)).unwrap();
                 }
 
             }
-            column = column.push(row);
+            content = content.push(row);
             if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
                 break
             }
         }
-        (column.into(), active_date.checked_add_days(Days::new(1)).unwrap())
+        (content.into(), active_date.checked_add_days(Days::new(1)).unwrap())
     }
 
     fn find_appointments_from_date(&self, active_date: NaiveDateTime) -> Vec<&Appointment> {
@@ -367,23 +411,26 @@ impl CalendarWidget{
             .unwrap()
             .and_hms_opt(0, 0, 0)
             .unwrap();
-        let mut column = column![];
+        let mut column = column![].spacing(5);
+        let month = active_date.month();
         loop {
             let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
             for i in 0..7 {
+                dbg!(self.active_date);
                 if active_date.day() == 1 && active_date.weekday().num_days_from_monday() != i {
                     row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
-                } else if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
-                    row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
+                    println!("not a day");
+                } else if month != active_date.month(){ 
+                        row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
                 } else {
-                    let _appointments = self.find_appointments_from_date(active_date);
-                    row = row.push(self.make_container(active_date));
-                    active_date = active_date.checked_add_days(Days::new(1)).unwrap();
+                        let _appointments = self.find_appointments_from_date(active_date);
+                        row = row.push(self.make_container(active_date));
+                        active_date = active_date.checked_add_days(Days::new(1)).unwrap();
                 }
-
             }
             column = column.push(row);
-            if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
+        
+            if active_date.day() == 1 {
                 break
             }
         }
@@ -399,143 +446,20 @@ impl CalendarWidget{
             content = content.push(Button::new(iced::widget::text(appointment.description())).width(Length::Fill)
                 .on_press(Message::EditAppointment(appointment.id)))
         }
-        content = content.push(Button::new("+")
-            .width(Length::Fill)
-            .on_press(Message::AddAppointment(active_date))
-        );
-        let container = Container::new(content)
+        // content = content.push(Button::new("+")
+        //     .width(Length::Fill)
+        //     .on_press(Message::AddAppointment(active_date))
+        // );
+        let container = Button::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(5)
             .style(DayContainer::new().move_to_style())
+            .on_press(Message::AddAppointment(active_date))
             .into();
     
         container
     }
-
-    // pub fn view_month<'a>(&self, active_date: NaiveDateTime) -> Element<'a, Message> {
-    //     let offset_start = date::first_day_in_month(active_date);
-    //     let offset_end = - date::last_day_in_month(active_date);
-    //     let mut weeks = (date::days_in_month(active_date) - 7 + offset_start + offset_end) / 7 ;
-    //     if offset_end == 0 {
-    //         weeks -= 1;
-    //     }
-    //     let mut first_date = NaiveDate::from_ymd_opt(active_date.year(), active_date.month(), 1)
-    //         .unwrap()
-    //         .and_hms_opt(0, 0, 0)
-    //         .unwrap();
-    //     let mut content = column![]
-    //         .width(Length::Fill)
-    //         .height(Length::Fill)
-    //         .spacing(10);
-
-    //     for i in 0..(weeks + 2) {
-    //         if i == 0 {
-    //             content = content
-    //                 .push(self.make_container_row(offset_start, first_date));
-    //             first_date = first_date.checked_add_days(Days::new(7 - offset_start as u64)).unwrap();
-    //         } else if i == weeks + 1 {
-    //             content = content
-    //                 .push(self.make_container_row(offset_end, first_date));
-    //         } else {
-    //             content = content
-    //                 .push(self.make_container_row(0, first_date));
-    //             first_date = first_date.checked_add_days(Days::new(7)).unwrap();
-    //         }
-    //     }
-
-    //     if let Some(DialogOption::Edit(appointment)) = &self.edit_dialog {
-    //         let modal = container(
-    //             column![
-    //                 column![
-    //                     text("Date").size(12),
-    //                     text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
-    //                         .on_input(Message::DialogDate)
-    //                 ],
-    //                 column![
-    //                     text("Warning").size(12),
-    //                     text_input("dd.mm.yyyy", self.dialog_appointment.warning.as_str())
-    //                         .on_input(Message::DialogWarning)
-    //                 ],
-    //                 column![
-    //                     text("Tags").size(12),
-    //                     text_input("tag_1, tag_2", self.dialog_appointment.tags.as_str())
-    //                         .on_input(Message::DialogTags)
-    //                 ],
-    //                 column![
-    //                     text("Description").size(12),
-    //                     text_input("", self.dialog_appointment.description.as_str())
-    //                         .on_input(Message::DialogDescription)
-    //                 ],
-    //                 column![
-    //                     text("Priority").size(12),
-    //                     PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
-    //                 ],
-    //                 row![
-    //                     button("Cancel")
-    //                         .on_press(Message::DialogCancel),
-    //                     Space::new(Length::Fill, Length::Shrink),
-    //                     button("Submit")
-    //                         .on_press(Message::DialogSubmit(Some(appointment.clone())))
-    //                     ]
-    //             ]
-    //             .spacing(20),
-    //         )
-    //         .width(300)
-    //         .padding(10)
-    //         .style(theme::Container::Box);
-            
-    //         Modal::new(content, modal)
-    //             .on_blur(Message::DialogCancel)
-    //             .into()
-    //     } else if let Some(DialogOption::Add(_date)) = self.edit_dialog {
-    //         let modal = container(
-    //             column![
-    //                 column![
-    //                     text("Date").size(12),
-    //                     text_input("dd.mm.yyyy", self.dialog_appointment.date.as_str())
-    //                         .on_input(Message::DialogDate)
-    //                 ],
-    //                 column![
-    //                     text("Warning").size(12),
-    //                     text_input("dd.mm.yyyy", self.dialog_appointment.warning.as_str())
-    //                         .on_input(Message::DialogWarning)
-    //                 ],
-    //                 column![
-    //                     text("Tags").size(12),
-    //                     text_input("tag_1, tag_2",self.dialog_appointment.tags.as_str())
-    //                         .on_input(Message::DialogTags)
-    //                 ],
-    //                 column![
-    //                     text("Description").size(12),
-    //                     text_input("", self.dialog_appointment.description.as_str())
-    //                         .on_input(Message::DialogDescription)
-    //                 ],
-    //                 column![
-    //                     text("Priority").size(12),
-    //                     PickList::new(Priority::ALL, Some(self.dialog_appointment.priority), Message::DialogPriority)
-    //                 ],
-    //                 row![
-    //                     button("Cancel")
-    //                         .on_press(Message::DialogCancel),
-    //                     Space::new(Length::Fill, Length::Shrink),
-    //                     button("Submit")
-    //                         .on_press(Message::DialogSubmit(None))
-    //                     ]
-    //             ]
-    //             .spacing(20),
-    //         )
-    //         .width(300)
-    //         .padding(10)
-    //         .style(theme::Container::Box);
-            
-    //         Modal::new(content, modal)
-    //             .on_blur(Message::DialogCancel)
-    //             .into()
-    //     } else {
-    //         return content.into()
-    //     }
-    // }
 
     pub fn handle_event(&mut self, event: iced_core::Event) -> Command<Message>{
         use iced_core::Event::*;
@@ -545,14 +469,14 @@ impl CalendarWidget{
                     if let ScrollDelta::Lines { x: _, y } = delta {
                         if self.modifiers.control() {
                             if y > 0.0 {
-                                self.depth = self.depth.depth_increase();
-                            } else {
                                 self.depth = self.depth.depth_decrease();
+                            } else {
+                                self.depth = self.depth.depth_increase();
                             }
                         } else if y > 0.0 {
-                            self.active_date = self.active_date.checked_sub_months(Months::new(1)).unwrap();
+                            let _ = self.update(Message::TimeDecrement);
                         } else {
-                            self.active_date = self.active_date.checked_add_months(Months::new(1)).unwrap();
+                            let _ = self.update(Message::TimeIncrement);
                         }
                     }
                 }
@@ -572,10 +496,34 @@ impl CalendarWidget{
                         return widget::focus_next()
                     }
                     iced_core::keyboard::Event::KeyPressed { 
-                        key_code: KeyCode:: Escape,
+                        key_code: KeyCode::Escape,
                         modifiers: _ 
                     } => {
                         self.edit_dialog = None;
+                    }
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode::Down, 
+                        modifiers: _,
+                    } => {
+                        return self.update(Message::TimeIncrement)
+                    }
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode::Up, 
+                        modifiers: _,
+                    } => {
+                        return self.update(Message::TimeDecrement)
+                    }
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode::Left, 
+                        modifiers: _,
+                    } => {
+                        self.depth = self.depth.depth_decrease();
+                    }
+                    iced_core::keyboard::Event::KeyPressed { 
+                        key_code: KeyCode::Right, 
+                        modifiers: _,
+                    } => {
+                        self.depth = self.depth.depth_increase();
                     }
                     iced_core::keyboard::Event::ModifiersChanged( modifiers) => {
                         self.modifiers = modifiers
@@ -587,43 +535,6 @@ impl CalendarWidget{
         }
         Command::none()
     }   
-
-    
-    
-    // pub fn make_container_row<'a>(&self, offset: i32, mut first_date: NaiveDateTime) -> Element<'a, Message> {
-    //     let mut content = row![]
-    //         .width(Length::Fill)
-    //         .height(Length::Fill)
-    //         .spacing(10);
-    //     for i in 0..7 {
-    //         let app_today = 'found: {
-    //             for appointment in &self.appointments {
-    //                 if appointment.date == date::naive_date_time_to_p_date(first_date) {
-    //                     break 'found Some(appointment);
-    //                 }
-    //             }
-    //             None
-    //         };
-            
-            
-    //         if offset > 0 && i < offset {
-    //             content = content.push(Container::new("").width(Length::Fill));
-    //         } else if offset > 0 && i >= offset {
-    //             content = content.push(self.make_container(app_today, first_date));
-    //             first_date = first_date.checked_add_days(Days::new(1)).unwrap();
-    //         } else if offset == 0 {
-    //             content = content.push(self.make_container(app_today, first_date));
-    //             first_date = first_date.checked_add_days(Days::new(1)).unwrap();
-    //         } else if offset < 0 && i > - offset {
-    //             content = content.push(Container::new("").width(Length::Fill));
-    //         } else if offset < 0 && i <= - offset {
-    //             content = content.push(self.make_container(app_today, first_date));
-    //             first_date = first_date.checked_add_days(Days::new(1)).unwrap();
-    //         }
-    //     }
-    //     content
-    //         .into()
-    // }
 }
 
 
@@ -647,23 +558,24 @@ impl DayContainer {
         Self::default()
     }
 
-    pub fn move_to_style(self) -> iced::theme::Container {
+    pub fn move_to_style(self) -> iced::theme::Button {
         self.into()
     }
 }
 
-impl std::convert::From<DayContainer> for iced::theme::Container {
+impl std::convert::From<DayContainer> for iced::theme::Button {
     fn from(value: DayContainer) -> Self {
-        iced::theme::Container::Custom(Box::new(value))
+        iced::theme::Button::Custom(Box::new(value))
     }
 }
 
-impl iced::widget::container::StyleSheet for DayContainer {
+impl iced::widget::button::StyleSheet for DayContainer {
     type Style = iced::theme::Theme;
 
-    fn appearance(&self, style: &Self::Style) -> Appearance {
+    fn active(&self, style: &Self::Style) -> Appearance {
         Appearance { 
-            text_color: Some(style.palette().text),
+            shadow_offset: Vector::new(0.0, 0.0),
+            text_color: Some(style.palette().text).unwrap(),
             background: Some(iced::Color::TRANSPARENT.into()), 
             border_radius: 6.0.into(), 
             border_width: 2.0.into(), 
