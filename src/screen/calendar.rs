@@ -3,9 +3,10 @@ use std::fmt::Debug;
 use chrono::naive::{NaiveDateTime, Days};
 use chrono::naive::NaiveDate;
 use chrono::{Datelike, Months};
-use iced::widget::{Text, text, button, container, text_input, PickList, Space, self, scrollable};
-use iced::widget::{column, button::Button, Container, row, container::Appearance};
+use iced::widget::{Text, text, button, container, text_input, PickList, Space, self, scrollable, Row};
+use iced::widget::{column, button::Button, Container, row, button::Appearance};
 use iced::{Element, Length, Command, theme, window};
+use iced_core::{Widget, Vector};
 use iced_core::keyboard::{KeyCode, Modifiers};
 use iced_core::mouse::ScrollDelta;
 use iced_core::alignment::Horizontal;
@@ -74,7 +75,7 @@ impl Default for DialogAppointment {
 impl DialogAppointment {
     fn from_appointment(appointment: Appointment) -> Self {
         let tags = appointment.tags.unwrap().join(", ");
-        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.warning.fmt(), tags: tags, description: appointment.description }
+        DialogAppointment { date: appointment.date.fmt(), priority: appointment.priority, warning: appointment.warning.fmt(), tags, description: appointment.description }
     }
 }
 
@@ -387,7 +388,7 @@ impl CalendarWidget{
                     row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
                 } else {
                     let _appointments = self.find_appointments_from_date(active_date);
-                    row = row.push(button(text("")).width(Length::Fill).height(Length::Fill));
+                    row = row.push(button(text("")).style(DayContainer::new().move_to_style()).width(Length::Fill).height(Length::Fill));
                     active_date = active_date.checked_add_days(Days::new(1)).unwrap();
                 }
 
@@ -410,23 +411,26 @@ impl CalendarWidget{
             .unwrap()
             .and_hms_opt(0, 0, 0)
             .unwrap();
-        let mut column = column![];
+        let mut column = column![].spacing(5);
+        let month = active_date.month();
         loop {
             let mut row = row![].spacing(5).width(Length::Fill).height(Length::Fill);
             for i in 0..7 {
+                dbg!(self.active_date);
                 if active_date.day() == 1 && active_date.weekday().num_days_from_monday() != i {
                     row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
-                } else if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
-                    row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
+                    println!("not a day");
+                } else if month != active_date.month(){ 
+                        row = row.push(container(text("")).width(Length::Fill).height(Length::Fill));
                 } else {
-                    let _appointments = self.find_appointments_from_date(active_date);
-                    row = row.push(self.make_container(active_date));
-                    active_date = active_date.checked_add_days(Days::new(1)).unwrap();
+                        let _appointments = self.find_appointments_from_date(active_date);
+                        row = row.push(self.make_container(active_date));
+                        active_date = active_date.checked_add_days(Days::new(1)).unwrap();
                 }
-
             }
             column = column.push(row);
-            if active_date.checked_add_days(Days::new(1)).unwrap().day() == 1 {
+        
+            if active_date.day() == 1 {
                 break
             }
         }
@@ -442,15 +446,16 @@ impl CalendarWidget{
             content = content.push(Button::new(iced::widget::text(appointment.description())).width(Length::Fill)
                 .on_press(Message::EditAppointment(appointment.id)))
         }
-        content = content.push(Button::new("+")
-            .width(Length::Fill)
-            .on_press(Message::AddAppointment(active_date))
-        );
-        let container = Container::new(content)
+        // content = content.push(Button::new("+")
+        //     .width(Length::Fill)
+        //     .on_press(Message::AddAppointment(active_date))
+        // );
+        let container = Button::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(5)
             .style(DayContainer::new().move_to_style())
+            .on_press(Message::AddAppointment(active_date))
             .into();
     
         container
@@ -461,7 +466,6 @@ impl CalendarWidget{
         match event {
             Mouse(e) => {
                 if let iced::mouse::Event::WheelScrolled { delta} = e {
-                    dbg!(&delta);
                     if let ScrollDelta::Lines { x: _, y } = delta {
                         if self.modifiers.control() {
                             if y > 0.0 {
@@ -554,23 +558,24 @@ impl DayContainer {
         Self::default()
     }
 
-    pub fn move_to_style(self) -> iced::theme::Container {
+    pub fn move_to_style(self) -> iced::theme::Button {
         self.into()
     }
 }
 
-impl std::convert::From<DayContainer> for iced::theme::Container {
+impl std::convert::From<DayContainer> for iced::theme::Button {
     fn from(value: DayContainer) -> Self {
-        iced::theme::Container::Custom(Box::new(value))
+        iced::theme::Button::Custom(Box::new(value))
     }
 }
 
-impl iced::widget::container::StyleSheet for DayContainer {
+impl iced::widget::button::StyleSheet for DayContainer {
     type Style = iced::theme::Theme;
 
-    fn appearance(&self, style: &Self::Style) -> Appearance {
+    fn active(&self, style: &Self::Style) -> Appearance {
         Appearance { 
-            text_color: Some(style.palette().text),
+            shadow_offset: Vector::new(0.0, 0.0),
+            text_color: Some(style.palette().text).unwrap(),
             background: Some(iced::Color::TRANSPARENT.into()), 
             border_radius: 6.0.into(), 
             border_width: 2.0.into(), 
